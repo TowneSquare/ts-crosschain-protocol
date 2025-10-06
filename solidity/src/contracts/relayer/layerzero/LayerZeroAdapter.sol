@@ -1,0 +1,192 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity 0.8.23;
+
+import "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import { ILayerZeroEndpointV2, MessagingParams, MessagingReceipt, MessagingFee } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
+import { OApp, MessagingFee, Origin } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
+import { ILayerZeroReceiver, Origin } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroReceiver.sol";
+
+import "./interfaces/IMessageRelayer.sol";
+import "./interfaces/IMessageDispatcher.sol";
+import "./libraries/Messages.sol";
+
+contract LayerZeroAdapter is IMessageRelayer, AccessControlDefaultAdminRules, OApp {
+    bytes32 public constant override MANAGER_ROLE = keccak256("MANAGER");
+    using OptionsBuilder for bytes;
+    using SafeCast for uint256;
+    using SafeCast for uint32;
+
+    error InvalidDeliveredValue(uint256 expectedValue, uint256 sentValue);
+
+    struct lzAdapterParams {
+        bool isAvailable;
+        uint32 lzChainId;
+        bytes32 adapterAddress;
+    }
+
+    mapping(uint16 townSquareChainId => lzAdapterParams) internal townSquareChainIdToLayerZeroAdapter;
+    mapping(uint32 layerZeroChainId => uint16 townSquareChainId) internal layerZeroChainIdTotownSquareChainId;
+
+    IMessageDispatcher public immutable messageDispatcher;
+
+    event ReceiveMessage(bytes32 indexed messageId, bytes32 adapterAddress);
+    event ChainAdded(uint16 townSquareChainId, uint32 lzChainId, bytes32 adapterAddress);
+    event ChainRemoved(uint16 townSquareChainId, uint32 lzChainId, bytes32 adapterAddress);
+
+    modifier onlyMessageDispatcher() {
+        if (msg.sender != address(messageDispatcher)) revert InvalidMessageDispatcher(msg.sender);
+        _;
+    }
+
+    constructor(
+        address admin,
+        address _endpoint,
+        IMessageDispatcher messageDispatcher_
+    ) Ownable(admin) OApp(_endpoint, admin) AccessControlDefaultAdminRules(1 days, admin) {
+        messageDispatcher = messageDispatcher_;
+        _grantRole(MANAGER_ROLE, admin);
+    }
+
+    function sendMessage(Messages.MessageToSend memory message) external payable override onlyMessageDispatcher {
+        // get chain adapter if available
+        (uint32 lzChainId, bytes32 adapterAddress) = getChainAdapter(message.destinationChainId);
+
+        // prepare payload by adding metadata
+        //bytes memory payloadWithMetadata = Messages.encodePayloadWithMetadata(message);
+        bytes memory payloadWithMetadata = abi.encodePacked(
+            message.params.receiverValue,
+            Messages.encodePayloadWithMetadata(message)
+        );
+        bytes memory options = OptionsBuilder
+            .newOptions()
+            .addExecutorLzReceiveOption(message.params.gasLimit.toUint128(), message.params.receiverValue.toUint128())
+            .addExecutorLzComposeOption(0, message.params.gasLimit.toUint128(), 0);
+
+        Messages.MessagePayload memory messagePayload = Messages.decodeActionPayload(message.payload);
+
+        // send using layerZero ENdpoint
+        MessagingReceipt memory receipt = endpoint.send{ value: msg.value }(
+            MessagingParams(lzChainId, adapterAddress, payloadWithMetadata, options, false),
+            Messages.convertGenericAddressToEVMAddress(messagePayload.userAddress)
+        );
+
+        emit SendMessage(receipt.guid, message);
+    }
+
+    function getSendFee(Messages.MessageToSend memory message) external view override returns (uint256 fee) {
+        // get chain adapter if available
+        (uint32 lzChainId, bytes32 adapterAddress) = getChainAdapter(message.destinationChainId);
+
+        // get cost of message delivery
+        bytes memory options = OptionsBuilder
+            .newOptions()
+            .addExecutorLzReceiveOption(message.params.gasLimit.toUint128(), message.params.receiverValue.toUint128())
+            .addExecutorLzComposeOption(0, message.params.gasLimit.toUint128(), 0);
+        // prepare payload by adding metadata
+        bytes memory payloadWithMetadata = Messages.encodePayloadWithMetadata(message);
+        MessagingFee memory messagingFee = endpoint.quote(
+            MessagingParams(lzChainId, adapterAddress, payloadWithMetadata, options, false),
+            address(this)
+        );
+        fee = messagingFee.nativeFee;
+    }
+
+    function getChainAdapter(uint16 chainId) public view returns (uint32 lzChainId, bytes32 adapterAddress) {
+        lzAdapterParams memory chainAdapter = townSquareChainIdToLayerZeroAdapter[chainId];
+        if (!chainAdapter.isAvailable) revert ChainUnavailable(chainId);
+
+        lzChainId = chainAdapter.lzChainId;
+        adapterAddress = chainAdapter.adapterAddress;
+    }
+
+    function lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
+    ) public payable override {
+        _lzReceive(_origin, _guid, _message, _executor, _extraData);
+    }
+
+    function addChain(
+        uint16 townSquareChainId,
+        uint32 lzChainId,
+        bytes32 adapterAddress
+    ) external onlyRole(MANAGER_ROLE) {
+        // check if chain is already added
+        bool isAvailable = isChainAvailable(townSquareChainId);
+        if (isAvailable) revert ChainAlreadyAdded(townSquareChainId);
+
+        // add chain
+        townSquareChainIdToLayerZeroAdapter[townSquareChainId] = lzAdapterParams({
+            isAvailable: true,
+            lzChainId: lzChainId,
+            adapterAddress: adapterAddress
+        });
+        layerZeroChainIdTotownSquareChainId[lzChainId] = townSquareChainId;
+        _setPeer(lzChainId, adapterAddress);
+        emit ChainAdded(townSquareChainId, lzChainId, adapterAddress);
+    }
+
+    function removeChain(uint16 townSquareChainId) external onlyRole(MANAGER_ROLE) {
+        // get chain adapter if available
+        (uint32 lzChainId, bytes32 adapterAddress) = getChainAdapter(townSquareChainId);
+
+        // remove chain
+        delete townSquareChainIdToLayerZeroAdapter[townSquareChainId];
+        delete layerZeroChainIdTotownSquareChainId[lzChainId];
+        _setPeer(lzChainId, bytes32(0));
+        emit ChainRemoved(townSquareChainId, lzChainId, adapterAddress);
+    }
+
+    function isChainAvailable(uint16 chainId) public view override returns (bool) {
+        return townSquareChainIdToLayerZeroAdapter[chainId].isAvailable;
+    }
+
+    function _lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata message,
+        address /*executor*/, // Executor address as specified by the OApp.
+        bytes calldata /*_extraData*/ // Any extra data or options to trigger on receipt.
+    ) internal override {
+        if (address(endpoint) != msg.sender) revert OnlyEndpoint(msg.sender);
+
+        // Ensure that the sender matches the expected peer for the source endpoint.
+        uint16 townSquareChainId = layerZeroChainIdTotownSquareChainId[_origin.srcEid];
+        (uint32 lzChainId, bytes32 adapterAddress) = getChainAdapter(townSquareChainId);
+        if (_origin.srcEid != lzChainId) revert ChainUnavailable(townSquareChainId);
+        if (adapterAddress != _origin.sender) revert InvalidMessageSender(_origin.sender);
+
+        (uint256 expectedReceiverValue, bytes memory payload) = Messages.decodeReceiverValue(message);
+
+        if (msg.value < expectedReceiverValue) revert InvalidDeliveredValue(expectedReceiverValue, msg.value);
+
+        (Messages.MessageMetadata memory metadata, bytes memory messagePayload) = Messages.decodePayloadWithMetadata(
+            payload
+        );
+
+        Messages.MessageReceived memory messageReceived = Messages.MessageReceived({
+            messageId: _guid,
+            sourceChainId: townSquareChainId,
+            sourceAddress: metadata.sender,
+            handler: metadata.handler,
+            payload: messagePayload,
+            returnAdapterId: metadata.returnAdapterId,
+            returnGasLimit: metadata.returnGasLimit
+        });
+        messageDispatcher.receiveMessage{ value: msg.value }(messageReceived);
+
+        emit ReceiveMessage(_guid, adapterAddress);
+    }
+
+    function owner() public view virtual override(AccessControlDefaultAdminRules, Ownable) returns (address) {
+        return AccessControlDefaultAdminRules.owner();
+    }
+
+    function setPeer(uint32 lzChainId, bytes32 adapterAddress) public override onlyRole(MANAGER_ROLE) {}
+}

@@ -9,7 +9,7 @@ import {ILegacyAssetRegistry} from "../../interfaces/ILegacyAssetRegistry.sol";
 import "../HubSpokeStructs.sol";
 import "../HubSpokeEvents.sol";
 
-contract LegacyAssetRegistry is ILegacyAssetRegistry, Ownable {
+contract LoanController is ILegacyAssetRegistry, Ownable {
     uint8 public constant PROTOCOL_MAX_DECIMALS = 18;
 
     mapping(address => AssetInfo) assetInfos;

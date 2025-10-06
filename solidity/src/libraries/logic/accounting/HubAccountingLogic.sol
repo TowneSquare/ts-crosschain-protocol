@@ -35,14 +35,53 @@ library HubAccountingLogic {
 
     // events need to be in both library and contract to be picked up
     // see: https://ethereum.stackexchange.com/questions/11137/watching-events-defined-in-libraries
-    event AccrualIndexUpdated(bytes32 indexed asset, uint256 deposit, uint256 borrow, uint256 timestamp);
-    event Deposit(address indexed vault, bytes32 indexed asset, uint256 amount, uint256 vaultTotalDeposited);
-    event Withdraw(address indexed vault, bytes32 indexed asset, uint256 amount, uint256 vaultTotalDeposited);
-    event Borrow(address indexed vault, bytes32 indexed asset, uint256 amount, uint256 vaultTotalBorrowed);
-    event Repay(address indexed vault, bytes32 indexed asset, uint256 amount, uint256 vaultTotalBorrowed);
-    event ReservesWithdrawn(bytes32 indexed asset, uint256 amount, uint16 destinationChain, bytes32 destinationAddress);
-    event AccountPairingRequestReceived(uint16 indexed chainId, bytes32 indexed account, bytes32 indexed userId);
-    event AccountPaired(uint16 indexed chainId, bytes32 indexed account, bytes32 indexed userId);
+    event AccrualIndexUpdated(
+        bytes32 indexed asset,
+        uint256 deposit,
+        uint256 borrow,
+        uint256 timestamp
+    );
+    event Deposit(
+        address indexed vault,
+        bytes32 indexed asset,
+        uint256 amount,
+        uint256 vaultTotalDeposited
+    );
+    event Withdraw(
+        address indexed vault,
+        bytes32 indexed asset,
+        uint256 amount,
+        uint256 vaultTotalDeposited
+    );
+    event Borrow(
+        address indexed vault,
+        bytes32 indexed asset,
+        uint256 amount,
+        uint256 vaultTotalBorrowed
+    );
+    event Repay(
+        address indexed vault,
+        bytes32 indexed asset,
+        uint256 amount,
+        uint256 vaultTotalBorrowed
+    );
+    event ReservesWithdrawn(
+        bytes32 indexed asset,
+        uint256 amount,
+        uint16 destinationChain,
+        bytes32 destinationAddress
+    );
+    event AccountPairingRequestReceived(
+        uint16 indexed chainId,
+        bytes32 indexed account,
+        bytes32 indexed userId
+    );
+    event AccountPaired(
+        uint16 indexed chainId,
+        bytes32 indexed account,
+        bytes32 indexed userId
+    );
+
     // end events from HubSpokeEvents
 
     function SPOKE_WITHDRAW_RESERVES_GAS_LIMIT() public pure returns (uint256) {
@@ -50,7 +89,9 @@ library HubAccountingLogic {
     }
 
     function requireRegisteredAsset(bytes32 asset) public view {
-        if (!HubStorage.getAuxilaryContracts().assetRegistry.assetExists(asset)) {
+        if (
+            !HubStorage.getAuxilaryContracts().assetRegistry.assetExists(asset)
+        ) {
             revert UnregisteredAsset();
         }
     }
@@ -60,11 +101,16 @@ library HubAccountingLogic {
         bytes32 _senderAddress
     ) public view returns (bytes32) {
         // the user ID is the b32 formatted address on Hub
-        if (_chainId == HubStorage.getAuxilaryContracts().wormholeTunnel.chainId()) {
+        if (
+            _chainId ==
+            HubStorage.getAuxilaryContracts().wormholeTunnel.chainId()
+        ) {
             return _senderAddress;
         }
 
-        bytes32 pairedAccount = HubStorage.getUserIdState().userIds[_chainId][_senderAddress];
+        bytes32 pairedAccount = HubStorage.getUserIdState().userIds[_chainId][
+            _senderAddress
+        ];
         if (pairedAccount != bytes32(0)) {
             return pairedAccount;
         }
@@ -89,8 +135,13 @@ library HubAccountingLogic {
         }
     }
 
-    function isEvmEOA(uint16 _chainId, bytes32 _senderAddress) public view returns (bool) {
-        return HubStorage.getAuxilaryContracts().wormholeTunnel.isEvm(_chainId) && !isContract(fromWormholeFormat(_senderAddress));
+    function isEvmEOA(
+        uint16 _chainId,
+        bytes32 _senderAddress
+    ) public view returns (bool) {
+        return
+            HubStorage.getAuxilaryContracts().wormholeTunnel.isEvm(_chainId) &&
+            !isContract(fromWormholeFormat(_senderAddress));
     }
 
     function isContract(address _addr) public view returns (bool) {
@@ -105,11 +156,16 @@ library HubAccountingLogic {
         bytes32 _userId,
         uint16 _targetChain
     ) public view returns (bytes32) {
-        if (_targetChain == HubStorage.getAuxilaryContracts().wormholeTunnel.chainId()) {
+        if (
+            _targetChain ==
+            HubStorage.getAuxilaryContracts().wormholeTunnel.chainId()
+        ) {
             return _userId;
         }
 
-        bytes32 targetAddress = HubStorage.getUserIdState().spokeChainAddresses[_userId][_targetChain];
+        bytes32 targetAddress = HubStorage.getUserIdState().spokeChainAddresses[
+            _userId
+        ][_targetChain];
         if (targetAddress != bytes32(0)) {
             return targetAddress;
         }
@@ -141,7 +197,9 @@ library HubAccountingLogic {
         bytes32 _account,
         bytes32 _userId
     ) public {
-        HubStorage.getUserIdState().pairingRequests[_chainId][_account] = _userId;
+        HubStorage.getUserIdState().pairingRequests[_chainId][
+            _account
+        ] = _userId;
         emit AccountPairingRequestReceived(_chainId, _account, _userId);
     }
 
@@ -150,7 +208,8 @@ library HubAccountingLogic {
         bytes32 _account,
         bytes32 _userId
     ) public {
-        HubSpokeStructs.UserIdState storage userIdState = HubStorage.getUserIdState();
+        HubSpokeStructs.UserIdState storage userIdState = HubStorage
+            .getUserIdState();
         if (userIdState.pairingRequests[_chainId][_account] != _userId) {
             revert PairingRequestNotFound();
         }
@@ -161,17 +220,43 @@ library HubAccountingLogic {
             address newAccountAddr = fromWormholeFormat(_account);
 
             // migrate funds from account being paired to userId
-            bytes32[] memory assets = HubStorage.getAuxilaryContracts().assetRegistry.getRegisteredAssets();
+            bytes32[] memory assets = HubStorage
+                .getAuxilaryContracts()
+                .assetRegistry
+                .getRegisteredAssets();
             for (uint256 i = 0; i < assets.length; i++) {
                 updateAccrualIndices(assets[i]);
-                HubSpokeStructs.DenormalizedVaultAmount memory currentBalance = InterestLogic.getVaultAmounts(userIdAddr, assets[i]);
-                HubSpokeStructs.DenormalizedVaultAmount memory newBalance = InterestLogic.getVaultAmounts(newAccountAddr, assets[i]);
+                HubSpokeStructs.DenormalizedVaultAmount
+                    memory currentBalance = InterestLogic.getVaultAmounts(
+                        userIdAddr,
+                        assets[i]
+                    );
+                HubSpokeStructs.DenormalizedVaultAmount
+                    memory newBalance = InterestLogic.getVaultAmounts(
+                        newAccountAddr,
+                        assets[i]
+                    );
                 emit Repay(newAccountAddr, assets[i], newBalance.borrowed, 0);
-                emit Withdraw(newAccountAddr, assets[i], newBalance.deposited, 0);
+                emit Withdraw(
+                    newAccountAddr,
+                    assets[i],
+                    newBalance.deposited,
+                    0
+                );
                 currentBalance.deposited += newBalance.deposited;
                 currentBalance.borrowed += newBalance.borrowed;
-                emit Deposit(userIdAddr, assets[i], newBalance.deposited, currentBalance.deposited);
-                emit Borrow(userIdAddr, assets[i], newBalance.borrowed, currentBalance.borrowed);
+                emit Deposit(
+                    userIdAddr,
+                    assets[i],
+                    newBalance.deposited,
+                    currentBalance.deposited
+                );
+                emit Borrow(
+                    userIdAddr,
+                    assets[i],
+                    newBalance.borrowed,
+                    currentBalance.borrowed
+                );
                 newBalance.deposited = 0;
                 newBalance.borrowed = 0;
                 setVaultAmounts(userIdAddr, assets[i], currentBalance);
@@ -198,9 +283,15 @@ library HubAccountingLogic {
 
         updateAccrualIndices(asset);
 
-        if (action == HubSpokeStructs.Action.Withdraw || action == HubSpokeStructs.Action.WithdrawNative) {
+        if (
+            action == HubSpokeStructs.Action.Withdraw ||
+            action == HubSpokeStructs.Action.WithdrawNative
+        ) {
             ValidationLogic.checkAllowedToWithdraw(user, asset, amount);
-        } else if (action == HubSpokeStructs.Action.Borrow || action == HubSpokeStructs.Action.BorrowNative) {
+        } else if (
+            action == HubSpokeStructs.Action.Borrow ||
+            action == HubSpokeStructs.Action.BorrowNative
+        ) {
             ValidationLogic.checkAllowedToBorrow(user, asset, amount);
         } else if (action == HubSpokeStructs.Action.Repay) {
             ValidationLogic.checkAllowedToRepay(user, asset, amount);
@@ -219,13 +310,17 @@ library HubAccountingLogic {
      *
      * @param assetId - The asset to update the interest accrual indices of
      */
-    function updateAccrualIndices(
-        bytes32 assetId
-    ) public {
-        HubSpokeStructs.AssetState storage assetState = HubStorage.getAssetState(assetId);
+    function updateAccrualIndices(bytes32 assetId) public {
+        HubSpokeStructs.AssetState storage assetState = HubStorage
+            .getAssetState(assetId);
         assetState.indices = InterestLogic.getCurrentAccrualIndices(assetId);
         assetState.lastActivityBlockTimestamp = block.timestamp;
-        emit AccrualIndexUpdated(assetId, assetState.indices.deposited, assetState.indices.borrowed, block.timestamp);
+        emit AccrualIndexUpdated(
+            assetId,
+            assetState.indices.deposited,
+            assetState.indices.borrowed,
+            block.timestamp
+        );
     }
 
     /**
@@ -242,20 +337,28 @@ library HubAccountingLogic {
         bytes32 asset,
         uint256 amount
     ) public {
-        HubSpokeStructs.DenormalizedVaultAmount memory vaultAmounts = InterestLogic.getVaultAmounts(vault, asset);
-        HubSpokeStructs.DenormalizedVaultAmount memory globalAmounts = InterestLogic.getGlobalAmounts(asset);
+        HubSpokeStructs.DenormalizedVaultAmount
+            memory vaultAmounts = InterestLogic.getVaultAmounts(vault, asset);
+        HubSpokeStructs.DenormalizedVaultAmount
+            memory globalAmounts = InterestLogic.getGlobalAmounts(asset);
 
         if (action == HubSpokeStructs.Action.Deposit) {
             vaultAmounts.deposited += amount;
             globalAmounts.deposited += amount;
 
             emit Deposit(vault, asset, amount, vaultAmounts.deposited);
-        } else if (action == HubSpokeStructs.Action.Withdraw || action == HubSpokeStructs.Action.WithdrawNative) {
+        } else if (
+            action == HubSpokeStructs.Action.Withdraw ||
+            action == HubSpokeStructs.Action.WithdrawNative
+        ) {
             vaultAmounts.deposited -= amount;
             globalAmounts.deposited -= amount;
 
             emit Withdraw(vault, asset, amount, vaultAmounts.deposited);
-        } else if (action == HubSpokeStructs.Action.Borrow || action == HubSpokeStructs.Action.BorrowNative) {
+        } else if (
+            action == HubSpokeStructs.Action.Borrow ||
+            action == HubSpokeStructs.Action.BorrowNative
+        ) {
             vaultAmounts.borrowed += amount;
             globalAmounts.borrowed += amount;
 
@@ -288,11 +391,15 @@ library HubAccountingLogic {
         bytes32 asset,
         HubSpokeStructs.DenormalizedVaultAmount memory vaultAmount
     ) public {
-        HubSpokeStructs.StoredVaultAmount storage vault = HubStorage.getAssetState(asset).userVaults[vaultOwner];
+        HubSpokeStructs.StoredVaultAmount storage vault = HubStorage
+            .getAssetState(asset)
+            .userVaults[vaultOwner];
         vault.amounts = vaultAmount;
         vault.accrualIndices = InterestLogic.getCurrentAccrualIndices(asset);
 
-        IMoneyMarketRewardsDistributor rewardDistributor = HubStorage.getAuxilaryContracts().rewardDistributor;
+        IMoneyMarketRewardsDistributor rewardDistributor = HubStorage
+            .getAuxilaryContracts()
+            .rewardDistributor;
         if (address(rewardDistributor) != address(0)) {
             rewardDistributor.handleBalanceChange(vaultOwner, asset);
         }
@@ -302,7 +409,9 @@ library HubAccountingLogic {
         bytes32 asset,
         HubSpokeStructs.DenormalizedVaultAmount memory vaultAmount
     ) public {
-        HubSpokeStructs.StoredVaultAmount storage totals = HubStorage.getAssetState(asset).totals;
+        HubSpokeStructs.StoredVaultAmount storage totals = HubStorage
+            .getAssetState(asset)
+            .totals;
         totals.amounts = vaultAmount;
         totals.accrualIndices = InterestLogic.getCurrentAccrualIndices(asset);
     }
@@ -317,13 +426,21 @@ library HubAccountingLogic {
         if (asset == bytes32(0)) {
             revert ZeroAddress();
         }
-        HubSpokeStructs.DenormalizedVaultAmount memory globalAmounts = InterestLogic.getGlobalAmounts(asset);
-        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage.getAuxilaryContracts();
+        HubSpokeStructs.DenormalizedVaultAmount
+            memory globalAmounts = InterestLogic.getGlobalAmounts(asset);
+        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage
+            .getAuxilaryContracts();
         uint16 thisChainId = auxContracts.wormholeTunnel.chainId();
-        address thisChainAsset = fromWormholeFormat(auxContracts.assetRegistry.getAssetAddress(asset, thisChainId));
-        uint256 tokenBalance = thisChainAsset == address(0) ? 0 : IERC20(thisChainAsset).balanceOf(address(this));
+        address thisChainAsset = fromWormholeFormat(
+            auxContracts.assetRegistry.getAssetAddress(asset, thisChainId)
+        );
+        uint256 tokenBalance = thisChainAsset == address(0)
+            ? 0
+            : IERC20(thisChainAsset).balanceOf(address(this));
 
-        uint16[] memory spokeChains = auxContracts.assetRegistry.getSupportedChains();
+        uint16[] memory spokeChains = auxContracts
+            .assetRegistry
+            .getSupportedChains();
         uint256 sumOfSpokeBalances = 0;
         // wrapped token balances can be removed once assets are fully migrated to Spokes
         uint256 sumOfWrappedTokenBalances = 0;
@@ -332,26 +449,47 @@ library HubAccountingLogic {
                 // skip Hub chain
                 continue;
             }
-            bytes32 spokeAssetAddress = auxContracts.assetRegistry.getAssetAddress(asset, spokeChains[i]);
+            bytes32 spokeAssetAddress = auxContracts
+                .assetRegistry
+                .getAssetAddress(asset, spokeChains[i]);
             if (spokeAssetAddress == bytes32(0)) {
                 // spoke doesn't support asset
                 continue;
             }
-            IERC20 wrappedToken = IERC20(auxContracts.wormholeTunnel.getTokenAddressOnThisChain(spokeChains[i], spokeAssetAddress));
-            if (address(wrappedToken) != address(0) && address(wrappedToken) != address(auxContracts.wormholeTunnel.USDC())) {
+            IERC20 wrappedToken = IERC20(
+                auxContracts.wormholeTunnel.getTokenAddressOnThisChain(
+                    spokeChains[i],
+                    spokeAssetAddress
+                )
+            );
+            if (
+                address(wrappedToken) != address(0) &&
+                address(wrappedToken) !=
+                address(auxContracts.wormholeTunnel.USDC())
+            ) {
                 // WH tunnel maps all CCTP USDC to a single ARB address, so we have to exclude the duplicates
                 // ARB USDC is accounted for as Hub chain USDC
-                sumOfWrappedTokenBalances += wrappedToken.balanceOf(address(this));
+                sumOfWrappedTokenBalances += wrappedToken.balanceOf(
+                    address(this)
+                );
             }
 
-            HubSpokeStructs.SpokeState storage spokeState = HubStorage.getSpokeState(spokeChains[i]);
-            sumOfSpokeBalances += spokeState.balances[spokeAssetAddress].finalized + spokeState.balances[spokeAssetAddress].unfinalized;
+            HubSpokeStructs.SpokeState storage spokeState = HubStorage
+                .getSpokeState(spokeChains[i]);
+            sumOfSpokeBalances +=
+                spokeState.balances[spokeAssetAddress].finalized +
+                spokeState.balances[spokeAssetAddress].unfinalized;
         }
 
         // reserves are all that the Hub and Spokes have minus what is owed to users
         // amount owed to users is the sum of deposits minus the sum of borrows
         // reserves = (hubBalance + spokeBalances) - (deposits - borrows) = hubBalance + spokeBalances + borrows - deposits
-        return tokenBalance + sumOfWrappedTokenBalances + sumOfSpokeBalances + globalAmounts.borrowed - globalAmounts.deposited;
+        return
+            tokenBalance +
+            sumOfWrappedTokenBalances +
+            sumOfSpokeBalances +
+            globalAmounts.borrowed -
+            globalAmounts.deposited;
     }
 
     /**
@@ -372,66 +510,105 @@ library HubAccountingLogic {
             revert ZeroAddress();
         }
 
-        uint256 reserveBalance = assetId == bytes32(0) ? address(this).balance : getReserveAmount(assetId);
+        uint256 reserveBalance = assetId == bytes32(0)
+            ? address(this).balance
+            : getReserveAmount(assetId);
         // can't withdraw more than reserve balance
         if (amount > reserveBalance) {
             amount = reserveBalance;
         }
 
-        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage.getAuxilaryContracts();
+        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage
+            .getAuxilaryContracts();
 
         uint16 hubChainId = auxContracts.wormholeTunnel.chainId();
 
         if (assetId == bytes32(0)) {
             // withdraw native ETH from Hub
-            (bool success,) = payable(fromWormholeFormat(destinationAddress)).call{value: amount}("");
+            (bool success, ) = payable(fromWormholeFormat(destinationAddress))
+                .call{value: amount}("");
             if (!success) {
                 revert TransferFailed();
             }
         } else if (destinationChain == hubChainId) {
             // withdraw native Hub chain token
-            IERC20 thisChainAsset = IERC20(fromWormholeFormat(auxContracts.assetRegistry.requireAssetAddress(assetId, hubChainId)));
-            thisChainAsset.safeTransfer(fromWormholeFormat(destinationAddress), amount);
+            IERC20 thisChainAsset = IERC20(
+                fromWormholeFormat(
+                    auxContracts.assetRegistry.requireAssetAddress(
+                        assetId,
+                        hubChainId
+                    )
+                )
+            );
+            thisChainAsset.safeTransfer(
+                fromWormholeFormat(destinationAddress),
+                amount
+            );
         } else {
             // x-chain withdraw
-            bytes32 spokeChainAddress = auxContracts.assetRegistry.requireAssetAddress(assetId, destinationChain);
-            HubSpokeStructs.SpokeState storage destinationSpokeState = HubStorage.getSpokeState(destinationChain);
-            // the Spoke needs to have enough finalized funds for the withdrawal
+            bytes32 spokeChainAddress = auxContracts
+                .assetRegistry
+                .requireAssetAddress(assetId, destinationChain);
+            HubSpokeStructs.SpokeState
+                storage destinationSpokeState = HubStorage.getSpokeState(
+                    destinationChain
+                );
+            // the SpokeController needs to have enough finalized funds for the withdrawal
             // unfinalized funds might not be there anymore
-            if (amount > destinationSpokeState.balances[spokeChainAddress].finalized) {
+            if (
+                amount >
+                destinationSpokeState.balances[spokeChainAddress].finalized
+            ) {
                 revert InsufficientFunds();
             }
-            // reduce the Spoke finalized funds by the amount withdrawn
-            destinationSpokeState.balances[spokeChainAddress].finalized -= amount;
+            // reduce the SpokeController finalized funds by the amount withdrawn
+            destinationSpokeState
+                .balances[spokeChainAddress]
+                .finalized -= amount;
 
             // send a x-chain withdrawal message
             IWormholeTunnel.TunnelMessage memory message;
             message.source = IWormholeTunnel.MessageSource(
                 hubChainId,
                 toWormholeFormat(address(this)),
-                destinationSpokeState.spoke // send any gas refund to Spoke on target
+                destinationSpokeState.spoke // send any gas refund to SpokeController on target
             );
             message.target = IWormholeTunnel.MessageTarget({
                 chainId: destinationChain,
                 recipient: destinationSpokeState.spoke,
                 selector: ISpoke.releaseFunds.selector,
-                payload: abi.encode(HubSpokeStructs.ReleaseFundsPayload({
-                    user: destinationAddress,
-                    token: spokeChainAddress,
-                    amount: amount,
-                    nonce: block.timestamp, // this is to prevent a repeat withdrawal in case of a Spoke chain re-delivery
-                    unwrapWeth: false
-                }))
+                payload: abi.encode(
+                    HubSpokeStructs.ReleaseFundsPayload({
+                        user: destinationAddress,
+                        token: spokeChainAddress,
+                        amount: amount,
+                        nonce: block.timestamp, // this is to prevent a repeat withdrawal in case of a SpokeController chain re-delivery
+                        unwrapWeth: false
+                    })
+                )
             });
             message.finality = IWormholeTunnel.MessageFinality.INSTANT;
-            uint256 withdrawCost = auxContracts.wormholeTunnel.getMessageCost(destinationChain, SPOKE_WITHDRAW_RESERVES_GAS_LIMIT(), 0, false);
+            uint256 withdrawCost = auxContracts.wormholeTunnel.getMessageCost(
+                destinationChain,
+                SPOKE_WITHDRAW_RESERVES_GAS_LIMIT(),
+                0,
+                false
+            );
             // it's ok to cover this cost from Hub ETH balance
             if (address(this).balance < withdrawCost) {
                 revert InsufficientMsgValue();
             }
-            auxContracts.wormholeTunnel.sendEvmMessage{value: withdrawCost}(message, SPOKE_WITHDRAW_RESERVES_GAS_LIMIT());
+            auxContracts.wormholeTunnel.sendEvmMessage{value: withdrawCost}(
+                message,
+                SPOKE_WITHDRAW_RESERVES_GAS_LIMIT()
+            );
         }
 
-        emit ReservesWithdrawn(assetId, amount, destinationChain, destinationAddress);
+        emit ReservesWithdrawn(
+            assetId,
+            amount,
+            destinationChain,
+            destinationAddress
+        );
     }
 }

@@ -24,7 +24,7 @@ These contracts model how borrowing costs evolve based on utilization and market
 Core logic for the **Hub** — the central component that holds global liquidity, manages asset data, and coordinates cross-chain actions.
 
 - `Hub.sol` — The Hub contract serves as the central liquidity and state management layer of the protocol.
-It coordinates all cross-chain interactions with Spoke contracts, manages registered assets, handles vault accounting, liquidation logic, and ensures consistency across chains through the Wormhole bridge. 
+It coordinates all cross-chain interactions with SpokeController contracts, manages registered assets, handles vault accounting, liquidation logic, and ensures consistency across chains through the Wormhole bridge. 
 - `AssetRegistry.sol` — Registers and maintains metadata for all supported assets and their wrapped equivalents.  
 - `HubStorage.sol` & `HubState.sol` — Contain core storage variables and manage system-level state persistence.  
 - `HubHelperViews.sol` — Provides read-only helper functions for querying Hub-related data.  
@@ -34,12 +34,12 @@ It coordinates all cross-chain interactions with Spoke contracts, manages regist
 ---
 
 ### **lendingSpoke/**
-Houses the **Spoke** contracts, which represent user-facing components deployed on external chains.  
-Each Spoke interacts with the Hub to synchronize liquidity and execute cross-chain lending operations.
+Houses the **SpokeController** contracts, which represent user-facing components deployed on external chains.  
+Each SpokeController interacts with the Hub to synchronize liquidity and execute cross-chain lending operations.
 
-- `Spoke.sol` — serves as the cross-chain entry point for user actions such as deposits, withdrawals, and borrows. It communicates with the **Hub** contract via **Wormhole messaging**, manages local token custody and optimistic finality logic, and ensures seamless cross-chain state synchronization. 
-- `SpokeGetters.sol` — Provides read-only getter functions for retrieving key configuration details of the Spoke contract, such as chain IDs, hub address, and default gas settings. 
-- `SpokeState.sol` — Defines and manages the **state structure** for the Spoke contract, storing essential variables like chain configuration, hub linkage, and Wormhole messaging parameters.
+- `SpokeController.sol` — serves as the cross-chain entry point for user actions such as deposits, withdrawals, and borrows. It communicates with the **Hub** contract via **Wormhole messaging**, manages local token custody and optimistic finality logic, and ensures seamless cross-chain state synchronization. 
+- `SpokeGetters.sol` — Provides read-only getter functions for retrieving key configuration details of the SpokeController contract, such as chain IDs, hub address, and default gas settings. 
+- `SpokeState.sol` — Defines and manages the **state structure** for the SpokeController contract, storing essential variables like chain configuration, hub linkage, and Wormhole messaging parameters.
 
 ---
 
@@ -93,13 +93,13 @@ Provides the **Wormhole bridging and messaging infrastructure** that powers cros
 - `WormholeTunnel.sol` — Core contract for sending and receiving Wormhole messages between chains.  
 - `TokenBridgeUtilities.sol` — Helper utilities for bridging tokens using the Wormhole Token Bridge.  
 - `TokenReceiverWithCCTP.sol` — Handles token receipts via Circle’s Cross-Chain Transfer Protocol (CCTP).  
-- `TunnelMessageBuilder.sol` — Constructs and decodes structured messages for Hub-Spoke communication.  
+- `TunnelMessageBuilder.sol` — Constructs and decodes structured messages for Hub-SpokeController communication.  
 
 ---
 
 ### **shared**
 
-- `HubSpokeEvents.sol` & `HubSpokeStructs.sol` — Contain shared events and data structures used across Hub and Spoke contracts.  
+- `HubSpokeEvents.sol` & `HubSpokeStructs.sol` — Contain shared events and data structures used across Hub and SpokeController contracts.  
 - `LegacyHubEvents.sol` — Maintains event compatibility with earlier protocol versions. 
 - Serves as the **central event registry** for monitoring cross-chain activities.
 - `Liquidator.sol` - Manages authorized liquidators and executes profitable liquidation calls through the Hub.

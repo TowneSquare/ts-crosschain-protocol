@@ -12,7 +12,7 @@ import {WormholeRelayerBase} from "./WormholeRelayerBase.sol";
 import "@wormhole-relayer/contracts/interfaces/relayer/TypedUnits.sol";
 import {ITownsqPriceOracle} from "../../../interfaces/ITownsqPriceOracle.sol";
 
-abstract contract WormholeRelayerSend is
+abstract contract SpokeMessageDispatcher is
     WormholeRelayerBase,
     IWormholeRelayerSend
 {

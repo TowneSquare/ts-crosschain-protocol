@@ -28,21 +28,21 @@ import {ILiquidationCalculator} from "../../interfaces/ILiquidationCalculator.so
 // This contract is to offset the storage of TokenSender and CCTPSender that have been removed from the inheritance
 contract StorageGap {
     // contract Base
-        // IWormholeRelayer public wormholeRelayer;
-        // IWormhole public wormhole;
+    // IWormholeRelayer public wormholeRelayer;
+    // IWormhole public wormhole;
 
-        // mapping(bytes32 => bool) public seenDeliveryVaaHashes;
+    // mapping(bytes32 => bool) public seenDeliveryVaaHashes;
 
-        // address registrationOwner;
-        // mapping(uint16 => bytes32) registeredSenders;
+    // address registrationOwner;
+    // mapping(uint16 => bytes32) registeredSenders;
 
-        // bool internal _wormholeRelayerInitialized;
+    // bool internal _wormholeRelayerInitialized;
     // contract TokenBase extends Base
-        // ITokenBridge public tokenBridge;
+    // ITokenBridge public tokenBridge;
     // contract CCTPBase is TokenBase
-        // ITokenMessenger public circleTokenMessenger;
-        // IMessageTransmitter public circleMessageTransmitter;
-        // address public USDC;
+    // ITokenMessenger public circleTokenMessenger;
+    // IMessageTransmitter public circleMessageTransmitter;
+    // address public USDC;
 
     // the gap array slot itself is one slot (which holds the number of elements in the array)
     // plus it holds 9 slots inside (9 elements in the array)
@@ -117,7 +117,9 @@ contract Hub is
      *
      * @param args struct with constructor arguments
      */
-    function initialize(HubSpokeStructs.ConstructorArgs memory args) public initializer {
+    function initialize(
+        HubSpokeStructs.ConstructorArgs memory args
+    ) public initializer {
         OwnableUpgradeable.__Ownable_init(msg.sender);
         PausableUpgradeable.__Pausable_init();
 
@@ -125,21 +127,28 @@ contract Hub is
             revert InvalidPrecision();
         }
 
-        HubSpokeStructs.FeesLimitsAndPrecisionsState storage flpState = HubStorage.getFeesLimitsAndPrecisionsState();
+        HubSpokeStructs.FeesLimitsAndPrecisionsState
+            storage flpState = HubStorage.getFeesLimitsAndPrecisionsState();
 
-        flpState.interestAccrualIndexPrecision = args.interestAccrualIndexPrecision;
+        flpState.interestAccrualIndexPrecision = args
+            .interestAccrualIndexPrecision;
         flpState.defaultGasLimit = 300_000;
         flpState.refundGasLimit = 60_000;
         setLiquidationFee(args.liquidationFee, args.liquidationFeePrecision);
         setWormholeTunnel(address(args.wormholeTunnel));
     }
 
-    function getVaultAmounts(address vaultOwner, bytes32 assetId) public view returns (HubSpokeStructs.DenormalizedVaultAmount memory) {
+    function getVaultAmounts(
+        address vaultOwner,
+        bytes32 assetId
+    ) public view returns (HubSpokeStructs.DenormalizedVaultAmount memory) {
         // from InterestLogic
         return InterestLogic.getVaultAmounts(vaultOwner, assetId);
     }
 
-    function getGlobalAmounts(bytes32 assetId) public view returns (HubSpokeStructs.DenormalizedVaultAmount memory) {
+    function getGlobalAmounts(
+        bytes32 assetId
+    ) public view returns (HubSpokeStructs.DenormalizedVaultAmount memory) {
         // from InterestLogic
         return InterestLogic.getGlobalAmounts(assetId);
     }
@@ -149,17 +158,25 @@ contract Hub is
      *
      * @param chainId - The chain id which the spoke is deployed on
      * @param spokeAddressWhFormat - The address of the spoke contract on its chain
-     * @param spokeWrappedNativeAssetAddress - the b32 home address of the wrapped Spoke chain native asset
+     * @param spokeWrappedNativeAssetAddress - the b32 home address of the wrapped SpokeController chain native asset
      */
-    function registerSpoke(uint16 chainId, bytes32 spokeAddressWhFormat, bytes32 spokeWrappedNativeAssetAddress) external onlyOwner {
-        HubSpokeStructs.SpokeState storage state = HubStorage.getSpokeState(chainId);
+    function registerSpoke(
+        uint16 chainId,
+        bytes32 spokeAddressWhFormat,
+        bytes32 spokeWrappedNativeAssetAddress
+    ) external onlyOwner {
+        HubSpokeStructs.SpokeState storage state = HubStorage.getSpokeState(
+            chainId
+        );
         state.spoke = spokeAddressWhFormat;
         state.wrappedNativeAsset = spokeWrappedNativeAssetAddress;
 
         emit SpokeRegistered(chainId, spokeAddressWhFormat);
     }
 
-    function getCurrentAccrualIndices(bytes32 assetId) public view returns (HubSpokeStructs.AccrualIndices memory) {
+    function getCurrentAccrualIndices(
+        bytes32 assetId
+    ) public view returns (HubSpokeStructs.AccrualIndices memory) {
         return InterestLogic.getCurrentAccrualIndices(assetId);
     }
 
@@ -170,7 +187,9 @@ contract Hub is
      *
      * @param input: The LiquidationInput struct containing the liquidation details, input amounts should be denormalized (real amounts)
      */
-    function liquidation(ILiquidationCalculator.LiquidationInput memory input) public whenNotPaused {
+    function liquidation(
+        ILiquidationCalculator.LiquidationInput memory input
+    ) public whenNotPaused {
         // TODO: remove once all users are migrated
         MigrationLogic.migrateUser(_deprecated_state, input.vault);
 
@@ -178,7 +197,7 @@ contract Hub is
         ValidationLogic.checkLiquidationInputsValid(input);
 
         // update all accrual indices
-        for (uint256 i = 0; i < input.assets.length;) {
+        for (uint256 i = 0; i < input.assets.length; ) {
             HubAccountingLogic.updateAccrualIndices(input.assets[i].assetId);
             unchecked {
                 i++;
@@ -188,41 +207,93 @@ contract Hub is
         // check if intended liquidation is valid
         ValidationLogic.checkAllowedToLiquidate(input);
 
-        (uint256 liquidationFee, uint256 precision) = getLiquidationFeeAndPrecision();
+        (
+            uint256 liquidationFee,
+            uint256 precision
+        ) = getLiquidationFeeAndPrecision();
 
-        IAssetRegistry assetRegistry = HubStorage.getAuxilaryContracts().assetRegistry;
-        uint16 chainId = HubStorage.getAuxilaryContracts().wormholeTunnel.chainId();
+        IAssetRegistry assetRegistry = HubStorage
+            .getAuxilaryContracts()
+            .assetRegistry;
+        uint16 chainId = HubStorage
+            .getAuxilaryContracts()
+            .wormholeTunnel
+            .chainId();
 
         // this flag will flip to true if the liquidator performs any action that could put their own
         // account into an undercollateralized state (such as repay from own vault instead of transfer)
         bool needToCheckLiquidatorHf = false;
 
-        for (uint256 i = 0; i < input.assets.length;) {
-            ILiquidationCalculator.DenormalizedLiquidationAsset memory asset = input.assets[i];
-            IERC20 assetToken = IERC20(fromWormholeFormat(assetRegistry.getAssetAddress(asset.assetId, chainId)));
+        for (uint256 i = 0; i < input.assets.length; ) {
+            ILiquidationCalculator.DenormalizedLiquidationAsset
+                memory asset = input.assets[i];
+            IERC20 assetToken = IERC20(
+                fromWormholeFormat(
+                    assetRegistry.getAssetAddress(asset.assetId, chainId)
+                )
+            );
 
             // update vault amounts
             if (asset.repaidAmount > 0) {
-                if (asset.repaymentMethod == ILiquidationCalculator.RepaymentMethod.FROM_DEPOSIT) {
+                if (
+                    asset.repaymentMethod ==
+                    ILiquidationCalculator.RepaymentMethod.FROM_DEPOSIT
+                ) {
                     needToCheckLiquidatorHf = true;
-                    HubAccountingLogic.updateVaultAmounts(HubSpokeStructs.Action.Withdraw, msg.sender, asset.assetId, asset.repaidAmount);
-                } else if (asset.repaymentMethod == ILiquidationCalculator.RepaymentMethod.DEBT_TAKEOVER) {
+                    HubAccountingLogic.updateVaultAmounts(
+                        HubSpokeStructs.Action.Withdraw,
+                        msg.sender,
+                        asset.assetId,
+                        asset.repaidAmount
+                    );
+                } else if (
+                    asset.repaymentMethod ==
+                    ILiquidationCalculator.RepaymentMethod.DEBT_TAKEOVER
+                ) {
                     needToCheckLiquidatorHf = true;
-                    HubAccountingLogic.updateVaultAmounts(HubSpokeStructs.Action.Borrow, msg.sender, asset.assetId, asset.repaidAmount);
+                    HubAccountingLogic.updateVaultAmounts(
+                        HubSpokeStructs.Action.Borrow,
+                        msg.sender,
+                        asset.assetId,
+                        asset.repaidAmount
+                    );
                 } else {
                     // send repay tokens from liquidator to contract
-                    assetToken.safeTransferFrom(msg.sender, address(this), asset.repaidAmount);
+                    assetToken.safeTransferFrom(
+                        msg.sender,
+                        address(this),
+                        asset.repaidAmount
+                    );
                 }
-                HubAccountingLogic.updateVaultAmounts(HubSpokeStructs.Action.Repay, input.vault, asset.assetId, asset.repaidAmount);
+                HubAccountingLogic.updateVaultAmounts(
+                    HubSpokeStructs.Action.Repay,
+                    input.vault,
+                    asset.assetId,
+                    asset.repaidAmount
+                );
             }
 
             if (asset.receivedAmount > 0) {
-                HubAccountingLogic.updateVaultAmounts(HubSpokeStructs.Action.Withdraw, input.vault, asset.assetId, asset.receivedAmount);
+                HubAccountingLogic.updateVaultAmounts(
+                    HubSpokeStructs.Action.Withdraw,
+                    input.vault,
+                    asset.assetId,
+                    asset.receivedAmount
+                );
                 // reward liquidator
-                uint256 feePortion = (asset.receivedAmount * liquidationFee) / precision;
+                uint256 feePortion = (asset.receivedAmount * liquidationFee) /
+                    precision;
                 uint256 amountToTransfer = asset.receivedAmount - feePortion;
-                if (asset.paymentMethod == ILiquidationCalculator.PaymentMethod.DEPOSIT_TAKEOVER) {
-                    HubAccountingLogic.updateVaultAmounts(HubSpokeStructs.Action.Deposit, msg.sender, asset.assetId, amountToTransfer);
+                if (
+                    asset.paymentMethod ==
+                    ILiquidationCalculator.PaymentMethod.DEPOSIT_TAKEOVER
+                ) {
+                    HubAccountingLogic.updateVaultAmounts(
+                        HubSpokeStructs.Action.Deposit,
+                        msg.sender,
+                        asset.assetId,
+                        amountToTransfer
+                    );
                 } else {
                     assetToken.safeTransfer(msg.sender, amountToTransfer);
                 }
@@ -236,7 +307,9 @@ contract Hub is
         if (needToCheckLiquidatorHf) {
             // the liquidator performed an action that could put their account underwater
             // need to check if the liquidators account is still collateralized
-            HubSpokeStructs.NotionalVaultAmount memory liquidatorNotionals = getPriceUtilities().getVaultEffectiveNotionals(msg.sender, true);
+            HubSpokeStructs.NotionalVaultAmount
+                memory liquidatorNotionals = getPriceUtilities()
+                    .getVaultEffectiveNotionals(msg.sender, true);
             if (liquidatorNotionals.deposited < liquidatorNotionals.borrowed) {
                 revert VaultUndercollateralized();
             }
@@ -245,8 +318,18 @@ contract Hub is
         emit Liquidation(msg.sender, input.vault, input.assets);
     }
 
-    function sendSpokeTopUp(uint16 spokeChainId, IERC20 token, uint256 amount, uint256 confirmationCost) public payable onlyOwner whenNotPaused {
-        HubOptimisticFinalityLogic.handleSendSpokeTopUp(spokeChainId, token, amount, confirmationCost);
+    function sendSpokeTopUp(
+        uint16 spokeChainId,
+        IERC20 token,
+        uint256 amount,
+        uint256 confirmationCost
+    ) public payable onlyOwner whenNotPaused {
+        HubOptimisticFinalityLogic.handleSendSpokeTopUp(
+            spokeChainId,
+            token,
+            amount,
+            confirmationCost
+        );
     }
 
     /**
@@ -254,14 +337,33 @@ contract Hub is
      * @param spokeChainId: The spoke's chainId to forward tokens to
      * @return The calculated return delivery cost
      */
-    function getCostForReturnDelivery(uint16 spokeChainId) public view returns (uint256) {
-        IWormholeTunnel wormholeTunnel = HubStorage.getAuxilaryContracts().wormholeTunnel;
-        uint256 defaultGasLimit = HubStorage.getFeesLimitsAndPrecisionsState().defaultGasLimit;
-        return wormholeTunnel.getMessageCost(spokeChainId, defaultGasLimit, 0, true);
+    function getCostForReturnDelivery(
+        uint16 spokeChainId
+    ) public view returns (uint256) {
+        IWormholeTunnel wormholeTunnel = HubStorage
+            .getAuxilaryContracts()
+            .wormholeTunnel;
+        uint256 defaultGasLimit = HubStorage
+            .getFeesLimitsAndPrecisionsState()
+            .defaultGasLimit;
+        return
+            wormholeTunnel.getMessageCost(
+                spokeChainId,
+                defaultGasLimit,
+                0,
+                true
+            );
     }
 
-    function getInstantActionCosts(uint16 spokeChainId, HubSpokeStructs.Action _action) public view returns (uint256[] memory) {
-        return HubOptimisticFinalityLogic.getInstantActionCosts(spokeChainId, _action);
+    function getInstantActionCosts(
+        uint16 spokeChainId,
+        HubSpokeStructs.Action _action
+    ) public view returns (uint256[] memory) {
+        return
+            HubOptimisticFinalityLogic.getInstantActionCosts(
+                spokeChainId,
+                _action
+            );
     }
 
     function userActionMessage(
@@ -269,21 +371,39 @@ contract Hub is
         IERC20,
         uint256,
         bytes calldata payload
-    ) external payable onlyWormholeTunnel onlySpokeSender(source) whenNotPaused {
-        HubSpokeStructs.UserActionPayload memory uap = abi.decode(payload, (HubSpokeStructs.UserActionPayload));
+    )
+        external
+        payable
+        onlyWormholeTunnel
+        onlySpokeSender(source)
+        whenNotPaused
+    {
+        HubSpokeStructs.UserActionPayload memory uap = abi.decode(
+            payload,
+            (HubSpokeStructs.UserActionPayload)
+        );
 
         if (_isTokenSend(uap.action)) {
             // only accepting deposits and repays through full finality action
             revert InvalidAction();
         }
 
-        bytes32 assetId = HubStorage.getAuxilaryContracts().assetRegistry.getAssetId(source.chainId, uap.token);
+        bytes32 assetId = HubStorage
+            .getAuxilaryContracts()
+            .assetRegistry
+            .getAssetId(source.chainId, uap.token);
         HubAccountingLogic.requireRegisteredAsset(assetId);
 
-        bytes32 userId = HubAccountingLogic.requireUserId(source.chainId, uap.user);
+        bytes32 userId = HubAccountingLogic.requireUserId(
+            source.chainId,
+            uap.user
+        );
 
         // TODO: remove this line when all users migrated
-        MigrationLogic.migrateUser(_deprecated_state, fromWormholeFormat(userId));
+        MigrationLogic.migrateUser(
+            _deprecated_state,
+            fromWormholeFormat(userId)
+        );
 
         HubAccountingLogic.accountForUserAction(
             userId,
@@ -292,8 +412,11 @@ contract Hub is
             uap.amount
         );
 
-        // since this message came with full finality, increase the Spoke finalized deposit balance
-        HubStorage.getSpokeState(source.chainId).balances[uap.token].finalized += uap.amount;
+        // since this message came with full finality, increase the SpokeController finalized deposit balance
+        HubStorage
+            .getSpokeState(source.chainId)
+            .balances[uap.token]
+            .finalized += uap.amount;
 
         // refund any overpaid return message ETH to the user
         _sendRefund(source);
@@ -304,27 +427,51 @@ contract Hub is
         IERC20 token,
         uint256 amount,
         bytes calldata payload
-    ) external payable onlyWormholeTunnel onlySpokeSender(source) whenNotPaused {
+    )
+        external
+        payable
+        onlyWormholeTunnel
+        onlySpokeSender(source)
+        whenNotPaused
+    {
         HubOptimisticFinalityLogic.requireNoTokenSent(token, amount);
 
-        HubSpokeStructs.UserActionPayload memory iap = abi.decode(payload, (HubSpokeStructs.UserActionPayload));
+        HubSpokeStructs.UserActionPayload memory iap = abi.decode(
+            payload,
+            (HubSpokeStructs.UserActionPayload)
+        );
 
-        HubSpokeStructs.SpokeState storage spokeState = HubStorage.getSpokeState(source.chainId);
+        HubSpokeStructs.SpokeState storage spokeState = HubStorage
+            .getSpokeState(source.chainId);
         if (spokeState.maxNonces[iap.user] >= iap.nonce) {
             revert InstantActionAlreadyProcessed();
         }
         spokeState.maxNonces[iap.user] = iap.nonce;
 
-        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage.getAuxilaryContracts();
-        bytes32 assetId = auxContracts.assetRegistry.getAssetId(source.chainId, iap.token);
+        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage
+            .getAuxilaryContracts();
+        bytes32 assetId = auxContracts.assetRegistry.getAssetId(
+            source.chainId,
+            iap.token
+        );
         HubAccountingLogic.requireRegisteredAsset(assetId);
 
-        _requireAssetToBeWethForNativeSendActions(iap.action, source.chainId, assetId);
+        _requireAssetToBeWethForNativeSendActions(
+            iap.action,
+            source.chainId,
+            assetId
+        );
 
-        bytes32 userId = HubAccountingLogic.requireUserId(source.chainId, iap.user);
+        bytes32 userId = HubAccountingLogic.requireUserId(
+            source.chainId,
+            iap.user
+        );
 
         // TODO: remove this line when all users migrated
-        MigrationLogic.migrateUser(_deprecated_state, fromWormholeFormat(userId));
+        MigrationLogic.migrateUser(
+            _deprecated_state,
+            fromWormholeFormat(userId)
+        );
 
         HubAccountingLogic.accountForUserAction(
             userId,
@@ -342,7 +489,12 @@ contract Hub is
         uint256 amount,
         bytes calldata payload
     ) external payable onlyWormholeTunnel onlySpokeSender(source) {
-        HubOptimisticFinalityLogic.handleConfirmTopUpMessage(source, token, amount, payload);
+        HubOptimisticFinalityLogic.handleConfirmTopUpMessage(
+            source,
+            token,
+            amount,
+            payload
+        );
     }
 
     function confirmFixLostCreditMessage(
@@ -351,7 +503,12 @@ contract Hub is
         uint256 amount,
         bytes calldata payload
     ) external payable onlyWormholeTunnel onlySpokeSender(source) {
-        HubOptimisticFinalityLogic.handleConfirmFixLostCreditMessage(source, token, amount, payload);
+        HubOptimisticFinalityLogic.handleConfirmFixLostCreditMessage(
+            source,
+            token,
+            amount,
+            payload
+        );
     }
 
     function finalizeCreditMessage(
@@ -370,8 +527,15 @@ contract Hub is
         uint256,
         bytes calldata payload
     ) external payable onlyWormholeTunnel onlySpokeSender(source) {
-        HubSpokeStructs.RequestPairingPayload memory rpp = abi.decode(payload, (HubSpokeStructs.RequestPairingPayload));
-        HubAccountingLogic.handlePairingRequest(source.chainId, rpp.newAccount, rpp.userId);
+        HubSpokeStructs.RequestPairingPayload memory rpp = abi.decode(
+            payload,
+            (HubSpokeStructs.RequestPairingPayload)
+        );
+        HubAccountingLogic.handlePairingRequest(
+            source.chainId,
+            rpp.newAccount,
+            rpp.userId
+        );
     }
 
     // ============ Same Chain User Functions ============
@@ -381,7 +545,11 @@ contract Hub is
      * @param assetId - the ID of the asset
      * @param amount - the amount of the asset
      */
-    function userActions(HubSpokeStructs.Action action, bytes32 assetId, uint256 amount) external payable whenNotPaused {
+    function userActions(
+        HubSpokeStructs.Action action,
+        bytes32 assetId,
+        uint256 amount
+    ) external payable whenNotPaused {
         if (!_isNativeTokenAction(action) && assetId == bytes32(0)) {
             revert UnusedParameterMustBeZero();
         }
@@ -389,26 +557,43 @@ contract Hub is
         // TODO: remove this line when all users migrated
         MigrationLogic.migrateUser(_deprecated_state, msg.sender);
 
-        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage.getAuxilaryContracts();
+        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage
+            .getAuxilaryContracts();
         IWETH weth = auxContracts.assetRegistry.WETH();
         uint16 hubChainId = auxContracts.wormholeTunnel.chainId();
 
-        (action,, amount) = CommonAccountingLogic.handleInboundTokensAndAdjustAction(
-            action,
-            assetId == bytes32(0) ? address(0) : fromWormholeFormat(auxContracts.assetRegistry.getAssetAddress(assetId, hubChainId)), // asset address on this chain or zero for native
-            amount,
-            weth
-        );
+        (action, , amount) = CommonAccountingLogic
+            .handleInboundTokensAndAdjustAction(
+                action,
+                assetId == bytes32(0)
+                    ? address(0)
+                    : fromWormholeFormat(
+                        auxContracts.assetRegistry.getAssetAddress(
+                            assetId,
+                            hubChainId
+                        )
+                    ), // asset address on this chain or zero for native
+                amount,
+                weth
+            );
 
         if (assetId == bytes32(0)) {
             // assetId zero needs to be remapped to WETH
             // earlier check makes sure it's a native action
-            assetId = auxContracts.assetRegistry.getAssetId(hubChainId, toWormholeFormat(address(weth)));
+            assetId = auxContracts.assetRegistry.getAssetId(
+                hubChainId,
+                toWormholeFormat(address(weth))
+            );
         }
 
         bytes32 msgSenderWhFormat = toWormholeFormat(msg.sender);
         // since this is a local (same-chain) action, msg.sender is both the sender of this action and the refundRecipient
-        IWormholeTunnel.MessageSource memory source = IWormholeTunnel.MessageSource(auxContracts.wormholeTunnel.chainId(), msgSenderWhFormat, msgSenderWhFormat);
+        IWormholeTunnel.MessageSource memory source = IWormholeTunnel
+            .MessageSource(
+                auxContracts.wormholeTunnel.chainId(),
+                msgSenderWhFormat,
+                msgSenderWhFormat
+            );
         HubAccountingLogic.accountForUserAction(
             HubAccountingLogic.requireUserId(hubChainId, msgSenderWhFormat),
             action,
@@ -431,17 +616,28 @@ contract Hub is
     }
 
     function _sendRefund(IWormholeTunnel.MessageSource memory source) internal {
-        IWormholeTunnel wormholeTunnel = HubStorage.getAuxilaryContracts().wormholeTunnel;
+        IWormholeTunnel wormholeTunnel = HubStorage
+            .getAuxilaryContracts()
+            .wormholeTunnel;
         if (source.chainId != wormholeTunnel.chainId()) {
             // refunds only make sense in a cross-chain context
-            uint256 cost = wormholeTunnel.getMessageCost(source.chainId, wormholeTunnel.GAS_USAGE_WITHOUT_TOKEN(), 0, false);
+            uint256 cost = wormholeTunnel.getMessageCost(
+                source.chainId,
+                wormholeTunnel.GAS_USAGE_WITHOUT_TOKEN(),
+                0,
+                false
+            );
             if (msg.value > cost) {
-                IWormholeTunnel.TunnelMessage memory message = TunnelMessageBuilder.createMessage(
-                    toWormholeFormat(address(this)),
-                    source.refundRecipient,
-                    source.chainId
+                IWormholeTunnel.TunnelMessage
+                    memory message = TunnelMessageBuilder.createMessage(
+                        toWormholeFormat(address(this)),
+                        source.refundRecipient,
+                        source.chainId
+                    );
+                wormholeTunnel.sendEvmMessage{value: msg.value}(
+                    message,
+                    HubStorage.getFeesLimitsAndPrecisionsState().refundGasLimit
                 );
-                wormholeTunnel.sendEvmMessage{value: msg.value}(message, HubStorage.getFeesLimitsAndPrecisionsState().refundGasLimit);
             }
         }
     }
@@ -452,13 +648,21 @@ contract Hub is
         uint256 amount,
         bool unwrapWeth
     ) internal {
-        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage.getAuxilaryContracts();
+        HubSpokeStructs.AuxilaryContracts storage auxContracts = HubStorage
+            .getAuxilaryContracts();
         // same chain transfer
-        IERC20 thisChainToken = IERC20(fromWormholeFormat(auxContracts.assetRegistry.getAssetAddress(assetId, auxContracts.wormholeTunnel.chainId())));
+        IERC20 thisChainToken = IERC20(
+            fromWormholeFormat(
+                auxContracts.assetRegistry.getAssetAddress(
+                    assetId,
+                    auxContracts.wormholeTunnel.chainId()
+                )
+            )
+        );
         IWETH weth = auxContracts.assetRegistry.WETH();
         if (address(thisChainToken) == address(weth) && unwrapWeth) {
             weth.withdraw(amount);
-            (bool success,) = payable(recipient).call{value: amount}("");
+            (bool success, ) = payable(recipient).call{value: amount}("");
             if (!success) {
                 revert TransferFailed();
             }
@@ -471,17 +675,29 @@ contract Hub is
         HubAccountingLogic.updateAccrualIndices(assetId);
     }
 
-    // last resort setter in case some unpredicted reverts happen and Spoke balances need to be corrected
-    function setSpokeBalances(uint16 chainId, bytes32 homeAddress, uint256 finalized, uint256 unfinalized) external onlyOwner {
+    // last resort setter in case some unpredicted reverts happen and SpokeController balances need to be corrected
+    function setSpokeBalances(
+        uint16 chainId,
+        bytes32 homeAddress,
+        uint256 finalized,
+        uint256 unfinalized
+    ) external onlyOwner {
         HubSpokeStructs.HubSpokeBalances memory balances;
         balances.finalized = finalized;
         balances.unfinalized = unfinalized;
-        HubOptimisticFinalityLogic.setSpokeBalances(chainId, homeAddress, balances);
+        HubOptimisticFinalityLogic.setSpokeBalances(
+            chainId,
+            homeAddress,
+            balances
+        );
     }
 
     function confirmPairingRequest(uint16 _chainId, bytes32 _account) external {
         if (getWormholeTunnel().isEvm(_chainId)) {
-            MigrationLogic.migrateUser(_deprecated_state, fromWormholeFormat(_account));
+            MigrationLogic.migrateUser(
+                _deprecated_state,
+                fromWormholeFormat(_account)
+            );
         }
         MigrationLogic.migrateUser(_deprecated_state, msg.sender);
 
@@ -491,25 +707,48 @@ contract Hub is
 
     // ============ Internal Functions ============
 
-    function _isTokenSend(HubSpokeStructs.Action action) internal pure returns (bool) {
-        return action == HubSpokeStructs.Action.Borrow || action == HubSpokeStructs.Action.Withdraw || _isNativeTokenSend(action);
+    function _isTokenSend(
+        HubSpokeStructs.Action action
+    ) internal pure returns (bool) {
+        return
+            action == HubSpokeStructs.Action.Borrow ||
+            action == HubSpokeStructs.Action.Withdraw ||
+            _isNativeTokenSend(action);
     }
 
-    function _isNativeTokenSend(HubSpokeStructs.Action action) internal pure returns (bool) {
-        return action == HubSpokeStructs.Action.BorrowNative || action == HubSpokeStructs.Action.WithdrawNative;
+    function _isNativeTokenSend(
+        HubSpokeStructs.Action action
+    ) internal pure returns (bool) {
+        return
+            action == HubSpokeStructs.Action.BorrowNative ||
+            action == HubSpokeStructs.Action.WithdrawNative;
     }
 
-    function _isNativeTokenReceive(HubSpokeStructs.Action action) internal pure returns (bool) {
-        return action == HubSpokeStructs.Action.DepositNative || action == HubSpokeStructs.Action.RepayNative;
+    function _isNativeTokenReceive(
+        HubSpokeStructs.Action action
+    ) internal pure returns (bool) {
+        return
+            action == HubSpokeStructs.Action.DepositNative ||
+            action == HubSpokeStructs.Action.RepayNative;
     }
 
-    function _isNativeTokenAction(HubSpokeStructs.Action action) internal pure returns (bool) {
+    function _isNativeTokenAction(
+        HubSpokeStructs.Action action
+    ) internal pure returns (bool) {
         return _isNativeTokenSend(action) || _isNativeTokenReceive(action);
     }
 
-    function _spokeChainWethAssetId(uint16 chainId) internal view returns (bytes32) {
-        IAssetRegistry assetRegistry = HubStorage.getAuxilaryContracts().assetRegistry;
-        return assetRegistry.getAssetId(chainId, HubStorage.getSpokeState(chainId).wrappedNativeAsset);
+    function _spokeChainWethAssetId(
+        uint16 chainId
+    ) internal view returns (bytes32) {
+        IAssetRegistry assetRegistry = HubStorage
+            .getAuxilaryContracts()
+            .assetRegistry;
+        return
+            assetRegistry.getAssetId(
+                chainId,
+                HubStorage.getSpokeState(chainId).wrappedNativeAsset
+            );
     }
 
     function _requireAssetToBeWethForNativeSendActions(
@@ -517,7 +756,10 @@ contract Hub is
         uint16 chainId,
         bytes32 assetId
     ) internal view {
-        if (_isNativeTokenSend(action) && assetId != _spokeChainWethAssetId(chainId)) {
+        if (
+            _isNativeTokenSend(action) &&
+            assetId != _spokeChainWethAssetId(chainId)
+        ) {
             // native withdraw or borrow, but invalid token provided
             revert InvalidAction();
         }
@@ -533,8 +775,18 @@ contract Hub is
      * @param destinationChain: The chain to withdraw to
      * @param amount: The amount of the wrapped asset to withdraw
      */
-    function withdrawReserves(bytes32 assetId, uint16 destinationChain, bytes32 destinationAddress, uint256 amount) external payable onlyOwner {
-        HubAccountingLogic.withdrawReserves(assetId, destinationChain, destinationAddress, amount);
+    function withdrawReserves(
+        bytes32 assetId,
+        uint16 destinationChain,
+        bytes32 destinationAddress,
+        uint256 amount
+    ) external payable onlyOwner {
+        HubAccountingLogic.withdrawReserves(
+            assetId,
+            destinationChain,
+            destinationAddress,
+            amount
+        );
     }
 
     function renounceOwnership() public view override onlyOwner {
@@ -555,11 +807,17 @@ contract Hub is
         return HubStorage.getSpokeState(uint16(chainId)).spoke;
     }
 
-    function getUserId(uint16 chainId, bytes32 userAddress) public view returns (bytes32) {
+    function getUserId(
+        uint16 chainId,
+        bytes32 userAddress
+    ) public view returns (bytes32) {
         return HubAccountingLogic.getUserId(chainId, userAddress);
     }
 
-    function getUserAddress(uint16 chainId, bytes32 userId) public view returns (bytes32) {
+    function getUserAddress(
+        uint16 chainId,
+        bytes32 userId
+    ) public view returns (bytes32) {
         return HubAccountingLogic.getUserAddress(userId, chainId);
     }
 

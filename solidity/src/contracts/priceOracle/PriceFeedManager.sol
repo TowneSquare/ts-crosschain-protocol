@@ -7,7 +7,7 @@ import {ITownsqPriceOracle, ITownsqPriceSource, AggregatorV3Interface} from "../
 /**
  * @title TownsqPriceOracle
  */
-contract TownsqPriceOracle is ITownsqPriceOracle, BaseTownsqPriceSource {
+contract PriceFeedManager is ITownsqPriceOracle, BaseTownsqPriceSource {
     mapping(bytes32 => PriceSource) public sources;
     AggregatorV3Interface public override sequencerUptimeFeed;
     uint256 public override sequencerGracePeriod;

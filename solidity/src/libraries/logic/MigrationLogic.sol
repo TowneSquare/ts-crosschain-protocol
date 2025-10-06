@@ -135,13 +135,13 @@ library MigrationLogic {
         uint16[] memory chains = assetRegistry.getSupportedChains();
         // for each spoke chain
         for (uint256 i = 0; i < chains.length; i++) {
-            // get Spoke chain address
+            // get SpokeController chain address
             bytes32 spokeAddr = assetRegistry.getAssetAddress(
                 _assetId,
                 chains[i]
             );
             if (spokeAddr == bytes32(0)) {
-                // Spoke doesn't support this asset
+                // SpokeController doesn't support this asset
                 continue;
             }
 
@@ -237,12 +237,12 @@ library MigrationLogic {
                 HubSpokeStructs.DenormalizedVaultAmount memory vault;
                 // for each spoke chain
                 for (uint256 cIdx = 0; cIdx < chains.length; cIdx++) {
-                    // get Spoke chain address
+                    // get SpokeController chain address
                     bytes32 spokeAddr = auxContracts
                         .assetRegistry
                         .getAssetAddress(assets[aIdx], chains[cIdx]);
                     if (spokeAddr == bytes32(0)) {
-                        // Spoke doesn't support this asset
+                        // SpokeController doesn't support this asset
                         continue;
                     }
 

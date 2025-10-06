@@ -9,6 +9,7 @@ import {toWormholeFormat} from "@wormhole/Utils.sol";
 // Wormhole wrapped tokens implement this interface
 interface IBridgeToken {
     function nativeContract() external view returns (bytes32);
+
     function chainId() external view returns (uint16);
 }
 
@@ -16,9 +17,9 @@ interface IERC20Symbol {
     function symbol() external view returns (string memory);
 }
 
-
 abstract contract AssetRegistryMigrator is IAssetRegistry {
-    address private constant LEGACY_ASSET_REGISTRY = 0x6510D7705dF7Ad4923B9699A1af4c72894087631;
+    address private constant LEGACY_ASSET_REGISTRY =
+        0x6510D7705dF7Ad4923B9699A1af4c72894087631;
     uint16 private constant HUB_CHAIN_ID = 23;
 
     error InvalidSymbol();
@@ -35,12 +36,33 @@ abstract contract AssetRegistryMigrator is IAssetRegistry {
         uint256 supplyLimit,
         uint256 borrowLimit
     ) public virtual override {}
-    function bindAsset(bytes32 _id, uint16 _chainId, bytes32 _address) public virtual override {}
-    function setCollateralizationRatios(string memory _name, uint256 _deposit, uint256 _borrow) public virtual override {}
-    function setLimits(string memory _name, uint256 _deposit, uint256 _borrow) public virtual override {}
-    function setMaxLiquidationBonus(string memory _name, uint256 _bonus) public virtual override {}
 
-    function getSymbolMainnet(address _addr) internal pure returns (string memory) {
+    function bindAsset(
+        bytes32 _id,
+        uint16 _chainId,
+        bytes32 _address
+    ) public virtual override {}
+
+    function setCollateralizationRatios(
+        string memory _name,
+        uint256 _deposit,
+        uint256 _borrow
+    ) public virtual override {}
+
+    function setLimits(
+        string memory _name,
+        uint256 _deposit,
+        uint256 _borrow
+    ) public virtual override {}
+
+    function setMaxLiquidationBonus(
+        string memory _name,
+        uint256 _bonus
+    ) public virtual override {}
+
+    function getSymbolMainnet(
+        address _addr
+    ) internal pure returns (string memory) {
         if (
             _addr == 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1 ||
             _addr == 0xD8369C2EDA18dD6518eABb1F85BD60606dEb39Ec ||
@@ -83,13 +105,9 @@ abstract contract AssetRegistryMigrator is IAssetRegistry {
             return "WEETH";
         } else if (_addr == 0x2d501d3e9cDAF8b80A17B99F7C47dC02376139C6) {
             return "CBETH";
-        } else if (
-            _addr == 0x47c031236e19d024b42f8AE6780E44A573170703
-        ) {
+        } else if (_addr == 0x47c031236e19d024b42f8AE6780E44A573170703) {
             return "GMBTC";
-        } else if (
-            _addr == 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336
-        ) {
+        } else if (_addr == 0x70d95587d40A2caf56bd97485aB3Eec10Bee6336) {
             return "GMETH";
         } else if (
             _addr == 0x57723abc582DBfE11Ea01f1A1f48aEE20bD65D73 ||
@@ -120,15 +138,17 @@ abstract contract AssetRegistryMigrator is IAssetRegistry {
     }
 
     function migrate() internal {
-        address[] memory assets = ILegacyAssetRegistry(LEGACY_ASSET_REGISTRY).getRegisteredAssets();
-        for(uint256 i = 0; i < assets.length; i++) {
+        address[] memory assets = ILegacyAssetRegistry(LEGACY_ASSET_REGISTRY)
+            .getRegisteredAssets();
+        for (uint256 i = 0; i < assets.length; i++) {
             migrateAsset(assets[i]);
         }
     }
 
     function migrateAsset(address assetAddress) internal {
-        ILegacyAssetRegistry.AssetInfo memory oldAssetInfo =
-            ILegacyAssetRegistry(LEGACY_ASSET_REGISTRY).getAssetInfo(assetAddress);
+        ILegacyAssetRegistry.AssetInfo
+            memory oldAssetInfo = ILegacyAssetRegistry(LEGACY_ASSET_REGISTRY)
+                .getAssetInfo(assetAddress);
         string memory symbol = getSymbolMainnet(assetAddress);
 
         migrateAssetInfo(symbol, oldAssetInfo);
@@ -139,9 +159,11 @@ abstract contract AssetRegistryMigrator is IAssetRegistry {
         string memory symbol,
         ILegacyAssetRegistry.AssetInfo memory oldAssetInfo
     ) internal {
-        IAssetRegistry.AssetInfo memory newAssetInfo = IAssetRegistry(address(this)).getAssetInfo(symbol);
-        if(!newAssetInfo.exists) {
-//            IAssetRegistry(assetRegistry).registerAsset(
+        IAssetRegistry.AssetInfo memory newAssetInfo = IAssetRegistry(
+            address(this)
+        ).getAssetInfo(symbol);
+        if (!newAssetInfo.exists) {
+            //            IAssetRegistry(assetRegistry).registerAsset(
             registerAsset(
                 symbol,
                 oldAssetInfo.decimals,
@@ -153,48 +175,77 @@ abstract contract AssetRegistryMigrator is IAssetRegistry {
                 oldAssetInfo.borrowLimit
             );
         } else {
-            if(oldAssetInfo.decimals != newAssetInfo.decimals) {
+            if (oldAssetInfo.decimals != newAssetInfo.decimals) {
                 revert InvalidDecimals();
             }
-            if(oldAssetInfo.interestRateCalculator != newAssetInfo.interestRateCalculator) {
+            if (
+                oldAssetInfo.interestRateCalculator !=
+                newAssetInfo.interestRateCalculator
+            ) {
                 revert InvalidInterestRateCalculator();
             }
 
-            uint256 crd = max(oldAssetInfo.collateralizationRatioDeposit, newAssetInfo.collateralizationRatioDeposit);
-            uint256 crb = max(oldAssetInfo.collateralizationRatioBorrow, newAssetInfo.collateralizationRatioBorrow);
-            uint256 maxLiquidationBonus = max(oldAssetInfo.maxLiquidationBonus, newAssetInfo.maxLiquidationBonus);
-            uint256 borrowLimit = oldAssetInfo.borrowLimit + newAssetInfo.borrowLimit;
-            uint256 supplyLimit = oldAssetInfo.supplyLimit + newAssetInfo.supplyLimit;
+            uint256 crd = max(
+                oldAssetInfo.collateralizationRatioDeposit,
+                newAssetInfo.collateralizationRatioDeposit
+            );
+            uint256 crb = max(
+                oldAssetInfo.collateralizationRatioBorrow,
+                newAssetInfo.collateralizationRatioBorrow
+            );
+            uint256 maxLiquidationBonus = max(
+                oldAssetInfo.maxLiquidationBonus,
+                newAssetInfo.maxLiquidationBonus
+            );
+            uint256 borrowLimit = oldAssetInfo.borrowLimit +
+                newAssetInfo.borrowLimit;
+            uint256 supplyLimit = oldAssetInfo.supplyLimit +
+                newAssetInfo.supplyLimit;
 
             setCollateralizationRatios(symbol, crd, crb);
             setLimits(symbol, supplyLimit, borrowLimit);
             setMaxLiquidationBonus(symbol, maxLiquidationBonus);
         }
-
     }
 
     function bindNewAsset(string memory symbol, address assetAddress) internal {
-        if(isBridgeToken(assetAddress)) {
+        if (isBridgeToken(assetAddress)) {
             uint16 chainId = IBridgeToken(assetAddress).chainId();
-            bytes32 baseChainAddress = IBridgeToken(assetAddress).nativeContract();
+            bytes32 baseChainAddress = IBridgeToken(assetAddress)
+                .nativeContract();
             bindAsset(_getAssetId(symbol), chainId, baseChainAddress);
         } else {
             bytes32 baseChainAddress = toWormholeFormat(assetAddress);
             bytes32 assetId = _getAssetId(symbol);
             bindAsset(assetId, HUB_CHAIN_ID, baseChainAddress);
             if (_getAssetId("USDC") == assetId) {
-                // bind other Spoke CCTP USDC addresses
-                bindAsset(assetId, 2, toWormholeFormat(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)); // ETH
-                bindAsset(assetId, 24, toWormholeFormat(0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85)); // OP
-                bindAsset(assetId, 30, toWormholeFormat(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)); // BASE
-                bindAsset(assetId, 1, 0xc6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d61); // SOL
+                // bind other SpokeController CCTP USDC addresses
+                bindAsset(
+                    assetId,
+                    2,
+                    toWormholeFormat(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
+                ); // ETH
+                bindAsset(
+                    assetId,
+                    24,
+                    toWormholeFormat(0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85)
+                ); // OP
+                bindAsset(
+                    assetId,
+                    30,
+                    toWormholeFormat(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)
+                ); // BASE
+                bindAsset(
+                    assetId,
+                    1,
+                    0xc6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d61
+                ); // SOL
             }
         }
-
     }
 
     // Check if asset is native to Hub chain or Wormhole Wrapped token which implements IBridgeToken
-    function isBridgeToken(address assetAddress) internal view returns(bool) {
+    function isBridgeToken(address assetAddress) internal view returns (bool) {
         (bool chainIdCheck, ) = assetAddress.staticcall(
             abi.encodeWithSelector(IBridgeToken.chainId.selector)
         );
@@ -216,5 +267,4 @@ abstract contract AssetRegistryMigrator is IAssetRegistry {
     function _getAssetId(string memory _name) internal pure returns (bytes32) {
         return keccak256(abi.encode(_name));
     }
-
 }

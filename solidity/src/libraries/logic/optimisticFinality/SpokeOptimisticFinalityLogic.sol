@@ -21,17 +21,50 @@ library SpokeOptimisticFinalityLogic {
 
     // events need to be in both library and contract to be picked up
     // see: https://ethereum.stackexchange.com/questions/11137/watching-events-defined-in-libraries
-    event SpokeCreditCreated(address indexed user, address indexed asset, uint256 amount, uint256 nonce);
-    event SpokeCreditLost(address indexed user, address indexed asset, uint256 amount, uint256 nonce);
-    event SpokeCreditRefundable(address indexed user, address indexed asset, uint256 amount, uint256 nonce);
+    event SpokeCreditCreated(
+        address indexed user,
+        address indexed asset,
+        uint256 amount,
+        uint256 nonce
+    );
+    event SpokeCreditLost(
+        address indexed user,
+        address indexed asset,
+        uint256 amount,
+        uint256 nonce
+    );
+    event SpokeCreditRefundable(
+        address indexed user,
+        address indexed asset,
+        uint256 amount,
+        uint256 nonce
+    );
     event SpokeCreditConfirmed(uint256 nonce);
     event SpokeCreditFinalized(uint256 nonce);
-    event SpokeCreditRefunded(address indexed user, address indexed asset, uint256 amount, uint256 nonce);
-    event SpokeLimitsChanged(address indexed asset, uint256 creditLimit, uint256 custodyLimit, uint256 transactionLimit);
+    event SpokeCreditRefunded(
+        address indexed user,
+        address indexed asset,
+        uint256 amount,
+        uint256 nonce
+    );
+    event SpokeLimitsChanged(
+        address indexed asset,
+        uint256 creditLimit,
+        uint256 custodyLimit,
+        uint256 transactionLimit
+    );
     event SpokeFeesChanged(uint256 inboundTokenFee, uint256 outboundTokenFee);
-    event SpokeFundsReleased(address indexed user, address indexed asset, uint256 amount, uint256 nonce);
+    event SpokeFundsReleased(
+        address indexed user,
+        address indexed asset,
+        uint256 amount,
+        uint256 nonce
+    );
     event SpokeTopUpReceived(address indexed asset, uint256 amount);
-    event PossibleHubMisconfiguration(address assetSentAsWeth, address realWeth);
+    event PossibleHubMisconfiguration(
+        address assetSentAsWeth,
+        address realWeth
+    );
     // end events from HubSpokeEvents
 
     error CreditAlreadyFinalized();
@@ -72,12 +105,19 @@ library SpokeOptimisticFinalityLogic {
         uint256 _custodyLimit,
         uint256 _transactionLimit
     ) public {
-        HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[toWormholeFormat(_token)];
+        HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[
+            toWormholeFormat(_token)
+        ];
         balance.creditLimit = _creditLimit;
         balance.custodyLimit = _custodyLimit;
         balance.transactionLimit = _transactionLimit;
         balance.lastUpdated = block.timestamp;
-        emit SpokeLimitsChanged(_token, _creditLimit, _custodyLimit, _transactionLimit);
+        emit SpokeLimitsChanged(
+            _token,
+            _creditLimit,
+            _custodyLimit,
+            _transactionLimit
+        );
     }
 
     function setInstantMessageFees(
@@ -86,12 +126,19 @@ library SpokeOptimisticFinalityLogic {
         uint256 _outboundTokenInstantMessageFee
     ) public {
         uint256 precision = INSTANT_MESSAGE_FEE_PRECISION();
-        if (_inboundTokenInstantMessageFee > precision || _outboundTokenInstantMessageFee > precision) {
+        if (
+            _inboundTokenInstantMessageFee > precision ||
+            _outboundTokenInstantMessageFee > precision
+        ) {
             revert InvalidAmount();
         }
         ofState.inboundTokenInstantMessageFee = _inboundTokenInstantMessageFee;
-        ofState.outboundTokenInstantMessageFee = _outboundTokenInstantMessageFee;
-        emit SpokeFeesChanged(_inboundTokenInstantMessageFee, _outboundTokenInstantMessageFee);
+        ofState
+            .outboundTokenInstantMessageFee = _outboundTokenInstantMessageFee;
+        emit SpokeFeesChanged(
+            _inboundTokenInstantMessageFee,
+            _outboundTokenInstantMessageFee
+        );
     }
 
     function handleInstantAction(
@@ -102,17 +149,27 @@ library SpokeOptimisticFinalityLogic {
         address asset,
         uint256 amount,
         uint256[] calldata costForReturnDelivery
-    )  public {
+    ) public {
         uint256[] memory costs;
         uint256 valueToSend = msg.value;
         {
             uint256 totalCost;
-            (totalCost, costs) = getInstantActionDeliveryCosts(commState, costForReturnDelivery);
+            (totalCost, costs) = getInstantActionDeliveryCosts(
+                commState,
+                costForReturnDelivery
+            );
             if (msg.value < totalCost) {
                 revert InsufficientMsgValue();
             }
 
-            (action, asset, amount, valueToSend) = CommonAccountingLogic.handleInboundTokensAndAdjustAction(action, asset, amount, weth, totalCost);
+            (action, asset, amount, valueToSend) = CommonAccountingLogic
+                .handleInboundTokensAndAdjustAction(
+                    action,
+                    asset,
+                    amount,
+                    weth,
+                    totalCost
+                );
         }
 
         if (amount == 0 || address(asset) == address(0)) {
@@ -121,10 +178,18 @@ library SpokeOptimisticFinalityLogic {
 
         ofState.lastInstantActionNonces[msg.sender]++; // increment the nonce for this action
 
-        if (CommonOptimisticFinalityLogic.getActionDirection(action) == HubSpokeStructs.ActionDirection.Inbound) {
+        if (
+            CommonOptimisticFinalityLogic.getActionDirection(action) ==
+            HubSpokeStructs.ActionDirection.Inbound
+        ) {
             // validation checks for instant deposits and repays
 
-            if (amount > ofState.tokenBalances[toWormholeFormat(address(asset))].transactionLimit) {
+            if (
+                amount >
+                ofState
+                    .tokenBalances[toWormholeFormat(address(asset))]
+                    .transactionLimit
+            ) {
                 revert TransactionLimitExceeded();
             }
 
@@ -134,29 +199,37 @@ library SpokeOptimisticFinalityLogic {
             }
 
             // check credit limit
-            HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[toWormholeFormat(address(asset))];
+            HubSpokeStructs.SpokeBalances storage balance = ofState
+                .tokenBalances[toWormholeFormat(address(asset))];
 
-            amount -= amount * ofState.inboundTokenInstantMessageFee / INSTANT_MESSAGE_FEE_PRECISION();
+            amount -=
+                (amount * ofState.inboundTokenInstantMessageFee) /
+                INSTANT_MESSAGE_FEE_PRECISION();
 
-            HubSpokeStructs.Credit storage storedCredit = ofState.storedCredits[msg.sender][ofState.lastInstantActionNonces[msg.sender]];
+            HubSpokeStructs.Credit storage storedCredit = ofState.storedCredits[
+                msg.sender
+            ][ofState.lastInstantActionNonces[msg.sender]];
 
             if (
                 storedCredit.createdAt != 0 &&
-                (
-                    storedCredit.token != toWormholeFormat(address(asset)) ||
-                    storedCredit.creditedAmount != amount
-                )
+                (storedCredit.token != toWormholeFormat(address(asset)) ||
+                    storedCredit.creditedAmount != amount)
             ) {
                 // there already exists a credit under that nonce and the token or amount conflicts
                 // this does not happen in a non-malicious flow
                 // it means the user sent a deposit that got reorg'd and it was registered on the Hub
                 // the user later replaced that deposit, because it was not re-executed with the same parameters
                 // take the tokens and the ETH to recover at least some of the value the attacker was already credited with
-                // these are added to the reserves on the Spoke since state is not updated
+                // these are added to the reserves on the SpokeController since state is not updated
                 // creditGiven was already updated when the reorg'd credit was confirmed by the Hub
                 storedCredit.status = HubSpokeStructs.CreditStatus.LOST;
                 storedCredit.updatedAt = block.timestamp;
-                emit SpokeCreditLost(msg.sender, asset, amount, ofState.lastInstantActionNonces[msg.sender]);
+                emit SpokeCreditLost(
+                    msg.sender,
+                    asset,
+                    amount,
+                    ofState.lastInstantActionNonces[msg.sender]
+                );
                 return;
             }
 
@@ -171,22 +244,35 @@ library SpokeOptimisticFinalityLogic {
                 balance.creditGiven += amount;
                 // this check is skipped if the credit already exists, because this credit has already been processed in the Hub
                 // in rare cases this can lead to credit limit being temporarily exceeded
-                if (balance.creditGiven + balance.creditLost > balance.creditLimit) {
-                   revert CreditLimitExceeded();
+                if (
+                    balance.creditGiven + balance.creditLost >
+                    balance.creditLimit
+                ) {
+                    revert CreditLimitExceeded();
                 }
 
                 // check if the currently finalized amount plus the pending amount is under the custody limit
-                if (balance.deposits + balance.unlocksPending > balance.custodyLimit) {
+                if (
+                    balance.deposits + balance.unlocksPending >
+                    balance.custodyLimit
+                ) {
                     revert CustodyLimitExceeded();
                 }
 
                 storedCredit.user = toWormholeFormat(msg.sender);
                 storedCredit.token = toWormholeFormat(address(asset));
                 storedCredit.creditedAmount = amount;
-                storedCredit.nonce = ofState.lastInstantActionNonces[msg.sender];
+                storedCredit.nonce = ofState.lastInstantActionNonces[
+                    msg.sender
+                ];
                 storedCredit.createdAt = block.timestamp;
 
-                emit SpokeCreditCreated(msg.sender, address(asset), amount, storedCredit.nonce);
+                emit SpokeCreditCreated(
+                    msg.sender,
+                    address(asset),
+                    amount,
+                    storedCredit.nonce
+                );
 
                 _sendInstantActionTunnelMessage(
                     ofState,
@@ -223,7 +309,11 @@ library SpokeOptimisticFinalityLogic {
                 revert InvalidCostForReturnDeliveryLength();
             }
 
-            if (ofState.tokenBalances[toWormholeFormat(address(asset))].deposits < amount) {
+            if (
+                ofState
+                    .tokenBalances[toWormholeFormat(address(asset))]
+                    .deposits < amount
+            ) {
                 revert InsufficientFunds();
             }
 
@@ -244,7 +334,10 @@ library SpokeOptimisticFinalityLogic {
         IWETH weth,
         bytes calldata payload
     ) public {
-        HubSpokeStructs.ReleaseFundsPayload memory rfp = abi.decode(payload, (HubSpokeStructs.ReleaseFundsPayload));
+        HubSpokeStructs.ReleaseFundsPayload memory rfp = abi.decode(
+            payload,
+            (HubSpokeStructs.ReleaseFundsPayload)
+        );
         if (rfp.token == bytes32(0) || rfp.amount == 0) {
             revert InvalidReleaseFundsPayload();
         }
@@ -267,16 +360,19 @@ library SpokeOptimisticFinalityLogic {
         ofState.tokenBalances[rfp.token].deposits -= rfp.amount;
         ofState.tokenBalances[rfp.token].lastUpdated = block.timestamp;
 
-        ofState.fundReleases[user][rfp.nonce] = HubSpokeStructs.SpokeFundRelease({
-            nonce: rfp.nonce,
-            user: rfp.user,
-            token: rfp.token,
-            amount: rfp.amount,
-            releasedAt: block.timestamp
-        });
+        ofState.fundReleases[user][rfp.nonce] = HubSpokeStructs
+            .SpokeFundRelease({
+                nonce: rfp.nonce,
+                user: rfp.user,
+                token: rfp.token,
+                amount: rfp.amount,
+                releasedAt: block.timestamp
+            });
         if (rfp.unwrapWeth && rfp.token == toWormholeFormat(address(weth))) {
             weth.withdraw(rfp.amount);
-            (bool success,) = fromWormholeFormat(rfp.user).call{value: rfp.amount}("");
+            (bool success, ) = fromWormholeFormat(rfp.user).call{
+                value: rfp.amount
+            }("");
             if (!success) {
                 revert TransferFailed();
             }
@@ -288,11 +384,19 @@ library SpokeOptimisticFinalityLogic {
             // we default to just transferring the token if the Hub somehow messed up and requested to unwrap something other than WETH.
             // reverting here would be problematic. we can't replay this, because it's simply invalid and will not become valid later.
             // it's probably best not to revert instants on non-critical issues.
-            // this should never happen anyway, because rfp.token is passed around in payloads from Spoke to Hub and back to Spoke without being changed.
-            IERC20(token).safeTransfer(fromWormholeFormat(rfp.user), rfp.amount);
+            // this should never happen anyway, because rfp.token is passed around in payloads from SpokeController to Hub and back to SpokeController without being changed.
+            IERC20(token).safeTransfer(
+                fromWormholeFormat(rfp.user),
+                rfp.amount
+            );
         }
 
-        emit SpokeFundsReleased(fromWormholeFormat(rfp.user), fromWormholeFormat(rfp.token), rfp.amount, rfp.nonce);
+        emit SpokeFundsReleased(
+            fromWormholeFormat(rfp.user),
+            fromWormholeFormat(rfp.token),
+            rfp.amount,
+            rfp.nonce
+        );
     }
 
     function handleTopUp(
@@ -303,7 +407,9 @@ library SpokeOptimisticFinalityLogic {
         uint256 amount
     ) public {
         token.safeTransferFrom(msg.sender, address(this), amount);
-        HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[toWormholeFormat(address(token))];
+        HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[
+            toWormholeFormat(address(token))
+        ];
         balance.deposits += amount;
         balance.lastUpdated = block.timestamp;
 
@@ -316,40 +422,66 @@ library SpokeOptimisticFinalityLogic {
         message.target.chainId = commState.hubChainId;
         message.target.recipient = commState.hubContractAddress;
         message.target.selector = IHub.confirmTopUpMessage.selector;
-        message.target.payload = abi.encode(HubSpokeStructs.ConfirmTopUpPayload({
-            token: toWormholeFormat(address(token)),
-            amount: amount
-        }));
+        message.target.payload = abi.encode(
+            HubSpokeStructs.ConfirmTopUpPayload({
+                token: toWormholeFormat(address(token)),
+                amount: amount
+            })
+        );
 
         message.finality = IWormholeTunnel.MessageFinality.INSTANT;
 
-        uint256 cost = commState.wormholeTunnel.getMessageCost(commState.hubChainId, HUB_CONFIRM_TOP_UP_GAS_LIMIT(), 0, false);
-        commState.wormholeTunnel.sendEvmMessage{value: cost}(message, HUB_CONFIRM_TOP_UP_GAS_LIMIT());
+        uint256 cost = commState.wormholeTunnel.getMessageCost(
+            commState.hubChainId,
+            HUB_CONFIRM_TOP_UP_GAS_LIMIT(),
+            0,
+            false
+        );
+        commState.wormholeTunnel.sendEvmMessage{value: cost}(
+            message,
+            HUB_CONFIRM_TOP_UP_GAS_LIMIT()
+        );
     }
 
     function handleConfirmCredit(
         HubSpokeStructs.SpokeOptimisticFinalityState storage ofState,
         bytes calldata payload
     ) public {
-        HubSpokeStructs.ConfirmCreditPayload memory ccp = abi.decode(payload, (HubSpokeStructs.ConfirmCreditPayload));
+        HubSpokeStructs.ConfirmCreditPayload memory ccp = abi.decode(
+            payload,
+            (HubSpokeStructs.ConfirmCreditPayload)
+        );
         address user = fromWormholeFormat(ccp.credit.user);
-        HubSpokeStructs.Credit storage storedCredit = ofState.storedCredits[user][ccp.credit.nonce];
-        if (CommonOptimisticFinalityLogic.creditMissingOrConflicting(ccp.credit, storedCredit)) {
+        HubSpokeStructs.Credit storage storedCredit = ofState.storedCredits[
+            user
+        ][ccp.credit.nonce];
+        if (
+            CommonOptimisticFinalityLogic.creditMissingOrConflicting(
+                ccp.credit,
+                storedCredit
+            )
+        ) {
             address token = fromWormholeFormat(ccp.credit.token);
-            HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[ccp.credit.token];
+            HubSpokeStructs.SpokeBalances storage balance = ofState
+                .tokenBalances[ccp.credit.token];
             if (storedCredit.createdAt != 0) {
                 // credit already exists with different user, token or amount
                 // this means that the credit being confirmed got reorg'd out of the spoke
                 // also, before the current confirmation arrived, a new credit has been given
-                // the credit in the Spoke is a new credit that replaced the one that got confirmed
-                // the Spoke credit got reverted when it reached the Hub (same user nonce) and is invalid
+                // the credit in the SpokeController is a new credit that replaced the one that got confirmed
+                // the SpokeController credit got reverted when it reached the Hub (same user nonce) and is invalid
                 // only the credit confirmed by the Hub actually got accounted for
                 // the credit coming from the Hub is lost, but the stored credit can still finalize
                 // if it finalizes, its amount will be added to reserves
-                // the incoming credit will never finalize, but it's not accounted for in the Spoke
+                // the incoming credit will never finalize, but it's not accounted for in the SpokeController
                 // signal that the stored credit is Lost
                 ccp.credit.status = HubSpokeStructs.CreditStatus.LOST;
-                emit SpokeCreditLost(user, token, ccp.credit.creditedAmount, ccp.credit.nonce);
+                emit SpokeCreditLost(
+                    user,
+                    token,
+                    ccp.credit.creditedAmount,
+                    ccp.credit.nonce
+                );
             } else {
                 // - we don't update SpokeBalances unlocksPending or deposits
                 //   if the action is non-malicious these values will be updated
@@ -357,14 +489,19 @@ library SpokeOptimisticFinalityLogic {
                 // - we don't increase the users nonce in anticipation that this was a non-malicious reorg
                 //   in this case the users deposit will be re-added under the same nonce
                 //   if the deposit is not re-added then the users action must have been malicious
-                //   the next user action will revert on the Hub, because the Spoke will send it with
+                //   the next user action will revert on the Hub, because the SpokeController will send it with
                 //   a nonce that already exists on the Hub
                 ccp.credit.status = HubSpokeStructs.CreditStatus.CONFIRMED;
-                emit SpokeCreditCreated(user, token, ccp.credit.creditedAmount, ccp.credit.nonce);
+                emit SpokeCreditCreated(
+                    user,
+                    token,
+                    ccp.credit.creditedAmount,
+                    ccp.credit.nonce
+                );
             }
 
             // re-create the credit
-            // regardless if the Spoke Credit is missing or conflicting, we overwrite it with what came from the Hub
+            // regardless if the SpokeController Credit is missing or conflicting, we overwrite it with what came from the Hub
             // because that's what was accounted for
             // Solidity quirk: can't use the storedCredit storage pointer for this assignment
             ccp.credit.createdAt = block.timestamp;
@@ -390,15 +527,25 @@ library SpokeOptimisticFinalityLogic {
         HubSpokeStructs.SpokeOptimisticFinalityState storage ofState,
         bytes calldata payload
     ) public {
-        HubSpokeStructs.FinalizeCreditPayload memory fcp = abi.decode(payload, (HubSpokeStructs.FinalizeCreditPayload));
+        HubSpokeStructs.FinalizeCreditPayload memory fcp = abi.decode(
+            payload,
+            (HubSpokeStructs.FinalizeCreditPayload)
+        );
         address user = fromWormholeFormat(fcp.credit.user);
-        HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[fcp.credit.token];
-        HubSpokeStructs.Credit storage storedCredit = ofState.storedCredits[user][fcp.credit.nonce];
+        HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[
+            fcp.credit.token
+        ];
+        HubSpokeStructs.Credit storage storedCredit = ofState.storedCredits[
+            user
+        ][fcp.credit.nonce];
         if (storedCredit.status == HubSpokeStructs.CreditStatus.CONFIRMED) {
             storedCredit.status = HubSpokeStructs.CreditStatus.FINALIZED;
             storedCredit.updatedAt = block.timestamp;
             emit SpokeCreditFinalized(fcp.credit.nonce);
-        } else if (storedCredit.createdAt > 0 && storedCredit.status == HubSpokeStructs.CreditStatus.PENDING) {
+        } else if (
+            storedCredit.createdAt > 0 &&
+            storedCredit.status == HubSpokeStructs.CreditStatus.PENDING
+        ) {
             // the credit has been created, but hasn't been confirmed by the Hub and hasn't been marked as LOST
             // one of two things could have happened here:
             //   - this was a failed malicious attempt where the original TX was a borrow
@@ -408,7 +555,12 @@ library SpokeOptimisticFinalityLogic {
             // in both cases a manual resolution is needed
             storedCredit.status = HubSpokeStructs.CreditStatus.REFUNDABLE;
             storedCredit.updatedAt = block.timestamp;
-            emit SpokeCreditRefundable(user, fromWormholeFormat(storedCredit.token), storedCredit.creditedAmount, storedCredit.nonce);
+            emit SpokeCreditRefundable(
+                user,
+                fromWormholeFormat(storedCredit.token),
+                storedCredit.creditedAmount,
+                storedCredit.nonce
+            );
         }
 
         // confirmed and pending credit cases are handled above
@@ -420,7 +572,10 @@ library SpokeOptimisticFinalityLogic {
         balance.lastUpdated = block.timestamp;
 
         balance.unlocksPending -= fcp.credit.creditedAmount;
-        if (ofState.storedCredits[user][fcp.credit.nonce].status == HubSpokeStructs.CreditStatus.FINALIZED) {
+        if (
+            ofState.storedCredits[user][fcp.credit.nonce].status ==
+            HubSpokeStructs.CreditStatus.FINALIZED
+        ) {
             // move the amount from credit to finalized deposit
             // only account towards deposits if this is a happy path with confirmed credit
             // if the credit was missing or conflicting then the credit being finalized has not been confirmed by the Hub
@@ -439,12 +594,19 @@ library SpokeOptimisticFinalityLogic {
         uint256 amount,
         bool fromReserves
     ) public {
-        HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[toWormholeFormat(address(token))];
+        HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[
+            toWormholeFormat(address(token))
+        ];
         if (balance.creditLost < amount) {
             revert InvalidAmount();
         }
 
-        uint256 cost = commState.wormholeTunnel.getMessageCost(commState.hubChainId, HUB_CONFIRM_TOP_UP_GAS_LIMIT(), 0, false);
+        uint256 cost = commState.wormholeTunnel.getMessageCost(
+            commState.hubChainId,
+            HUB_CONFIRM_TOP_UP_GAS_LIMIT(),
+            0,
+            false
+        );
 
         // the cost can be covered either by passing it as msg.value or from reserves
         // either way the balance needs to exceed the cost
@@ -454,7 +616,10 @@ library SpokeOptimisticFinalityLogic {
 
         if (!fromReserves) {
             token.safeTransferFrom(msg.sender, address(this), amount);
-        } else if (SpokeAccountingLogic.getReserveAmount(ofState, address(token)) < amount) {
+        } else if (
+            SpokeAccountingLogic.getReserveAmount(ofState, address(token)) <
+            amount
+        ) {
             revert InsufficientFunds();
         }
 
@@ -462,7 +627,7 @@ library SpokeOptimisticFinalityLogic {
         balance.deposits += amount;
 
         // this flow is the same as a top up confirmation
-        // it just increases the Hub accounted Spoke finalized deposit balance
+        // it just increases the Hub accounted SpokeController finalized deposit balance
         // sent as an instant, because owner is assumed to not be malicious
         bytes32 spokeAddressWhFormat = toWormholeFormat(address(this));
         IWormholeTunnel.TunnelMessage memory message;
@@ -472,14 +637,19 @@ library SpokeOptimisticFinalityLogic {
         message.target.chainId = commState.hubChainId;
         message.target.recipient = commState.hubContractAddress;
         message.target.selector = IHub.confirmFixLostCreditMessage.selector;
-        message.target.payload = abi.encode(HubSpokeStructs.ConfirmFixLostCreditPayload({
-            token: toWormholeFormat(address(token)),
-            amount: amount
-        }));
+        message.target.payload = abi.encode(
+            HubSpokeStructs.ConfirmFixLostCreditPayload({
+                token: toWormholeFormat(address(token)),
+                amount: amount
+            })
+        );
 
         message.finality = IWormholeTunnel.MessageFinality.INSTANT;
 
-        commState.wormholeTunnel.sendEvmMessage{value: cost}(message, HUB_CONFIRM_TOP_UP_GAS_LIMIT());
+        commState.wormholeTunnel.sendEvmMessage{value: cost}(
+            message,
+            HUB_CONFIRM_TOP_UP_GAS_LIMIT()
+        );
     }
 
     function handleRefundCredit(
@@ -487,7 +657,9 @@ library SpokeOptimisticFinalityLogic {
         address _user,
         uint256 _nonce
     ) public {
-        HubSpokeStructs.Credit storage credit = ofState.storedCredits[_user][_nonce];
+        HubSpokeStructs.Credit storage credit = ofState.storedCredits[_user][
+            _nonce
+        ];
         if (credit.status != HubSpokeStructs.CreditStatus.REFUNDABLE) {
             // the credit has been confirmed by the Hub
             // there can be no refund
@@ -496,13 +668,21 @@ library SpokeOptimisticFinalityLogic {
         }
 
         IERC20 token = IERC20(fromWormholeFormat(credit.token));
-        if (SpokeAccountingLogic.getReserveAmount(ofState, address(token)) < credit.creditedAmount) {
+        if (
+            SpokeAccountingLogic.getReserveAmount(ofState, address(token)) <
+            credit.creditedAmount
+        ) {
             revert InsufficientFunds();
         }
 
         credit.status = HubSpokeStructs.CreditStatus.REFUNDED;
         token.safeTransfer(_user, credit.creditedAmount);
-        emit SpokeCreditRefunded(_user, address(token), credit.creditedAmount, _nonce);
+        emit SpokeCreditRefunded(
+            _user,
+            address(token),
+            credit.creditedAmount,
+            _nonce
+        );
     }
 
     function _sendFinalizeCreditTunnelMessage(
@@ -519,9 +699,9 @@ library SpokeOptimisticFinalityLogic {
         message.target.chainId = commState.hubChainId;
         message.target.recipient = commState.hubContractAddress;
         message.target.selector = IHub.finalizeCreditMessage.selector;
-        message.target.payload = abi.encode(HubSpokeStructs.FinalizeCreditPayload({
-            credit: credit
-        }));
+        message.target.payload = abi.encode(
+            HubSpokeStructs.FinalizeCreditPayload({credit: credit})
+        );
 
         message.receiverValue = returnDeliveryCost;
 
@@ -548,13 +728,15 @@ library SpokeOptimisticFinalityLogic {
         message.target.chainId = commState.hubChainId;
         message.target.recipient = commState.hubContractAddress;
         message.target.selector = IHub.instantActionMessage.selector;
-        message.target.payload = abi.encode(HubSpokeStructs.UserActionPayload({
-            user: message.source.refundRecipient,
-            action: action,
-            token: asset,
-            amount: amount,
-            nonce: ofState.lastInstantActionNonces[msg.sender]
-        }));
+        message.target.payload = abi.encode(
+            HubSpokeStructs.UserActionPayload({
+                user: message.source.refundRecipient,
+                action: action,
+                token: asset,
+                amount: amount,
+                nonce: ofState.lastInstantActionNonces[msg.sender]
+            })
+        );
 
         message.finality = IWormholeTunnel.MessageFinality.INSTANT;
         message.receiverValue = returnDeliveryCost;

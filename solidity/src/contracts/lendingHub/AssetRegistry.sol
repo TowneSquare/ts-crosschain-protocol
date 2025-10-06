@@ -11,7 +11,6 @@ import "../HubSpokeStructs.sol";
 import "../HubSpokeEvents.sol";
 import {AssetRegistryMigrator} from "../migration/AssetRegistryMigrator.sol";
 
-
 //contract AssetRegistry is IAssetRegistry, OwnableUpgradeable {
 contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
     event AssetRegistered(
@@ -24,8 +23,16 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         uint256 maxLiquidationBonus
     );
     event AssetRemoved(bytes32 asset);
-    event CollateralizationRatiosChanged(bytes32 asset, uint256 collateralizationRatioDeposit, uint256 collateralizationRatioBorrow);
-    event LimitsChanged(bytes32 asset, uint256 supplyLimit, uint256 borrowLimit);
+    event CollateralizationRatiosChanged(
+        bytes32 asset,
+        uint256 collateralizationRatioDeposit,
+        uint256 collateralizationRatioBorrow
+    );
+    event LimitsChanged(
+        bytes32 asset,
+        uint256 supplyLimit,
+        uint256 borrowLimit
+    );
     event LiquidationBonusChanged(bytes32 asset, uint256 bonus);
     event InterestRateCalculatorChanged(bytes32 asset, address calculator);
     event AssetBindingAdded(bytes32 id, uint16 chainId, bytes32 assetAddress);
@@ -79,23 +86,35 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
     // GETTERS
     //
 
-    function getAssetId(string memory _name) public pure override returns (bytes32) {
+    function getAssetId(
+        string memory _name
+    ) public pure override returns (bytes32) {
         return keccak256(abi.encode(_name));
     }
 
-    function getAssetId(uint16 _chainId, bytes32 _address) public view override returns (bytes32) {
+    function getAssetId(
+        uint16 _chainId,
+        bytes32 _address
+    ) public view override returns (bytes32) {
         return assetIds[_chainId][_address];
     }
 
-    function getAssetName(bytes32 _assetId) public view override returns (string memory) {
+    function getAssetName(
+        bytes32 _assetId
+    ) public view override returns (string memory) {
         return assetNames[_assetId];
     }
 
-    function getAssetName(uint16 _chainId, bytes32 _address) external view override returns (string memory) {
+    function getAssetName(
+        uint16 _chainId,
+        bytes32 _address
+    ) external view override returns (string memory) {
         return getAssetName(getAssetId(_chainId, _address));
     }
 
-    function assetExists(string memory _name) public view override returns (bool) {
+    function assetExists(
+        string memory _name
+    ) public view override returns (bool) {
         return assetExists(getAssetId(_name));
     }
 
@@ -103,30 +122,48 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         return assetInfos[_id].exists;
     }
 
-    function getAssetInfo(string memory _name) public view override returns (AssetInfo memory) {
+    function getAssetInfo(
+        string memory _name
+    ) public view override returns (AssetInfo memory) {
         return getAssetInfo(getAssetId(_name));
     }
 
-    function getAssetInfo(bytes32 _id) public view override returns (AssetInfo memory) {
+    function getAssetInfo(
+        bytes32 _id
+    ) public view override returns (AssetInfo memory) {
         return assetInfos[_id];
     }
 
-    function getAssetAddress(string memory _name, uint16 _chainId) public view override returns (bytes32) {
+    function getAssetAddress(
+        string memory _name,
+        uint16 _chainId
+    ) public view override returns (bytes32) {
         return getAssetAddress(getAssetId(_name), _chainId);
     }
 
-    function getAssetAddress(bytes32 _id, uint16 _chainId) public view override returns (bytes32) {
+    function getAssetAddress(
+        bytes32 _id,
+        uint16 _chainId
+    ) public view override returns (bytes32) {
         return assetAddresses[_id][_chainId];
     }
 
-    function requireAssetAddress(bytes32 _id, uint16 _chainId) public view override returns (bytes32) {
+    function requireAssetAddress(
+        bytes32 _id,
+        uint16 _chainId
+    ) public view override returns (bytes32) {
         if (assetAddresses[_id][_chainId] == bytes32(0)) {
             revert AssetNotRegistered();
         }
         return assetAddresses[_id][_chainId];
     }
 
-    function getRegisteredAssets() public view override returns (bytes32[] memory) {
+    function getRegisteredAssets()
+        public
+        view
+        override
+        returns (bytes32[] memory)
+    {
         return registeredAssets;
     }
 
@@ -138,11 +175,19 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
     // SETTERS
     //
 
-    function setCollateralizationRatios(string memory _name, uint256 _deposit, uint256 _borrow) public override {
+    function setCollateralizationRatios(
+        string memory _name,
+        uint256 _deposit,
+        uint256 _borrow
+    ) public override {
         setCollateralizationRatios(getAssetId(_name), _deposit, _borrow);
     }
 
-    function setCollateralizationRatios(bytes32 _id, uint256 _deposit, uint256 _borrow) public override onlyOwner requireAsset(_id) {
+    function setCollateralizationRatios(
+        bytes32 _id,
+        uint256 _deposit,
+        uint256 _borrow
+    ) public override onlyOwner requireAsset(_id) {
         if (_deposit < COLLATERALIZATION_RATIO_PRECISION) {
             revert DepositCollateralizationRatioTooLow();
         }
@@ -158,11 +203,19 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         emit CollateralizationRatiosChanged(_id, _deposit, _borrow);
     }
 
-    function setLimits(string memory _name, uint256 _deposit, uint256 _borrow) public override {
+    function setLimits(
+        string memory _name,
+        uint256 _deposit,
+        uint256 _borrow
+    ) public override {
         setLimits(getAssetId(_name), _deposit, _borrow);
     }
 
-    function setLimits(bytes32 _id, uint256 _deposit, uint256 _borrow) public override onlyOwner requireAsset(_id) {
+    function setLimits(
+        bytes32 _id,
+        uint256 _deposit,
+        uint256 _borrow
+    ) public override onlyOwner requireAsset(_id) {
         AssetInfo storage assetInfo = assetInfos[_id];
         assetInfo.supplyLimit = _deposit;
         assetInfo.borrowLimit = _borrow;
@@ -170,11 +223,17 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         emit LimitsChanged(_id, _deposit, _borrow);
     }
 
-    function setMaxLiquidationBonus(string memory _name, uint256 _bonus) public override {
+    function setMaxLiquidationBonus(
+        string memory _name,
+        uint256 _bonus
+    ) public override {
         setMaxLiquidationBonus(getAssetId(_name), _bonus);
     }
 
-    function setMaxLiquidationBonus(bytes32 _id, uint256 _bonus) public override onlyOwner requireAsset(_id) {
+    function setMaxLiquidationBonus(
+        bytes32 _id,
+        uint256 _bonus
+    ) public override onlyOwner requireAsset(_id) {
         if (_bonus < LIQUIDATION_BONUS_PRECISION) {
             revert InvalidInput();
         }
@@ -184,11 +243,17 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         emit LiquidationBonusChanged(_id, _bonus);
     }
 
-    function setInterestRateCalculator(string memory _name, address _calculator) public override {
+    function setInterestRateCalculator(
+        string memory _name,
+        address _calculator
+    ) public override {
         setInterestRateCalculator(getAssetId(_name), _calculator);
     }
 
-    function setInterestRateCalculator(bytes32 _id, address _calculator) public override onlyOwner requireAsset(_id) {
+    function setInterestRateCalculator(
+        bytes32 _id,
+        address _calculator
+    ) public override onlyOwner requireAsset(_id) {
         AssetInfo storage assetInfo = assetInfos[_id];
         assetInfo.interestRateCalculator = _calculator;
 
@@ -286,7 +351,9 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         delete assetInfos[id];
         for (uint256 i = 0; i < registeredAssets.length; i++) {
             if (registeredAssets[i] == id) {
-                registeredAssets[i] = registeredAssets[registeredAssets.length - 1];
+                registeredAssets[i] = registeredAssets[
+                    registeredAssets.length - 1
+                ];
                 registeredAssets.pop();
             }
         }
@@ -296,16 +363,28 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         emit AssetRemoved(id);
     }
 
-    // binds a Spoke chain asset address to the asset identifier
-    function bindAsset(string memory _name, uint16 _chainId, bytes32 _address) public override onlyOwner {
+    // binds a SpokeController chain asset address to the asset identifier
+    function bindAsset(
+        string memory _name,
+        uint16 _chainId,
+        bytes32 _address
+    ) public override onlyOwner {
         bindAsset(getAssetId(_name), _chainId, _address);
     }
 
-    function bindAssets(string memory _name, uint16[] calldata _chains, bytes32[] calldata _addresses) public override onlyOwner {
+    function bindAssets(
+        string memory _name,
+        uint16[] calldata _chains,
+        bytes32[] calldata _addresses
+    ) public override onlyOwner {
         bindAssets(getAssetId(_name), _chains, _addresses);
     }
 
-    function bindAssets(bytes32 _id, uint16[] calldata _chains, bytes32[] calldata _addresses) public override onlyOwner {
+    function bindAssets(
+        bytes32 _id,
+        uint16[] calldata _chains,
+        bytes32[] calldata _addresses
+    ) public override onlyOwner {
         if (_chains.length != _addresses.length) {
             revert InvalidInput();
         }
@@ -314,7 +393,11 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         }
     }
 
-    function bindAsset(bytes32 _id, uint16 _chainId, bytes32 _address) public onlyOwner requireAsset(_id) override {
+    function bindAsset(
+        bytes32 _id,
+        uint16 _chainId,
+        bytes32 _address
+    ) public override onlyOwner requireAsset(_id) {
         if (_id == bytes32(0) || _chainId == 0 || _address == bytes32(0)) {
             revert InvalidInput();
         }
@@ -335,7 +418,7 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         emit AssetBindingAdded(_id, _chainId, _address);
     }
 
-    // removes Spoke chain asset binding from the asset identifier
+    // removes SpokeController chain asset binding from the asset identifier
     function unbindAsset(string memory _name, uint16 _chainId) public override {
         unbindAsset(getAssetId(_name), _chainId);
     }
@@ -344,7 +427,10 @@ contract AssetRegistry is OwnableUpgradeable, AssetRegistryMigrator {
         unbindAsset(assetIds[_chainId][_address], _chainId);
     }
 
-    function unbindAsset(bytes32 _id, uint16 _chainId) public override onlyOwner requireAsset(_id) {
+    function unbindAsset(
+        bytes32 _id,
+        uint16 _chainId
+    ) public override onlyOwner requireAsset(_id) {
         // _id non-zero is implied from requireAsset
         if (_chainId == 0 || assetAddresses[_id][_chainId] == bytes32(0)) {
             revert InvalidInput();

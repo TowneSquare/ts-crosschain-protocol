@@ -11,7 +11,7 @@ import {WormholeRelayerBase} from "./WormholeRelayerBase.sol";
 import {WormholeRelayerStorage} from "./WormholeRelayerStorage.sol";
 
 //WormholeRelayerGovernance inherits from ERC1967Upgrade, i.e. this is a proxy contract!
-contract WormholeRelayer is
+contract HubMessageDispatcher is
     WormholeRelayerGovernance,
     WormholeRelayerSend,
     WormholeRelayerDelivery,

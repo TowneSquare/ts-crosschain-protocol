@@ -5,9 +5,9 @@ import "../HubSpokeStructs.sol";
 
 /**
  * @title SpokeStorage
- * @notice Contract defining state variables for the Spoke contract
+ * @notice Contract defining state variables for the SpokeController contract
  */
-contract SpokeStorage {
+contract SpokeNativeToken {
     struct State {
         uint16 chainId;
         // number of confirmations for wormhole messages
@@ -23,7 +23,7 @@ contract SpokeStorage {
 
 /**
  * @title SpokeState
- * @notice Contract holding state variable for the Spoke contract
+ * @notice Contract holding state variable for the SpokeController contract
  */
 contract SpokeState {
     SpokeStorage.State _state;

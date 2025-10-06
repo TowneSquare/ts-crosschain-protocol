@@ -10,7 +10,7 @@ import {IMoneyMarketRewardsDistributor} from "../interfaces/rewards/IMoneyMarket
 
 /**
  * @title HubSpokeStructs
- * @notice A set of structs and enums used in the Hub and Spoke contracts
+ * @notice A set of structs and enums used in the Hub and SpokeController contracts
  */
 library HubSpokeStructs {
     /**
@@ -106,15 +106,16 @@ library HubSpokeStructs {
         bytes32 userId;
     }
 
-    enum Action {      // mapping to use in Laika so that I don't have to count each time
-        Deposit,       // 0
-        Borrow,        // 1
-        Withdraw,      // 2
-        Repay,         // 3
+    enum Action {
+        // mapping to use in Laika so that I don't have to count each time
+        Deposit, // 0
+        Borrow, // 1
+        Withdraw, // 2
+        Repay, // 3
         DepositNative, // 4
-        RepayNative,   // 5
-        WithdrawNative,// 6
-        BorrowNative   // 7
+        RepayNative, // 5
+        WithdrawNative, // 6
+        BorrowNative // 7
     }
 
     enum ActionDirection {
@@ -123,12 +124,12 @@ library HubSpokeStructs {
     }
 
     enum CreditStatus {
-        PENDING,     // before confirmation arrives
-        CONFIRMED,   // after Hub confirms it
-        REFUNDABLE,  // if it gets finalized, but hasn't been confirmed earlier
-        FINALIZED,   // after it gets finalized. terminal status.
-        REFUNDED,    // after a refund is processed. terminal status.
-        LOST         // after a credit conflict is found. this means that the deposit/repay was accounted for, but the Credit got reorg'd and there now is a deficit. terminal status.
+        PENDING, // before confirmation arrives
+        CONFIRMED, // after Hub confirms it
+        REFUNDABLE, // if it gets finalized, but hasn't been confirmed earlier
+        FINALIZED, // after it gets finalized. terminal status.
+        REFUNDED, // after a refund is processed. terminal status.
+        LOST // after a credit conflict is found. this means that the deposit/repay was accounted for, but the Credit got reorg'd and there now is a deficit. terminal status.
     }
 
     struct Credit {
@@ -143,9 +144,9 @@ library HubSpokeStructs {
     }
 
     struct SpokeBalances {
-        uint256 creditGiven; // amount of tokens sent by the user to the Spoke, but not yet finalized
+        uint256 creditGiven; // amount of tokens sent by the user to the SpokeController, but not yet finalized
         uint256 creditLost; // amount of credit that got reorg'd and then stolen
-        uint256 unlocksPending; // amount of non-finalized Spoke-side deposits
+        uint256 unlocksPending; // amount of non-finalized SpokeController-side deposits
         uint256 creditLimit; // the limit of tokens that can be sent in flight
         uint256 custodyLimit; // the limit of tokens that can be held in custody
         uint256 transactionLimit; // the limit of tokens that can be transferred in a single TX
@@ -154,11 +155,11 @@ library HubSpokeStructs {
     }
 
     struct SpokeFundRelease {
-        uint256 nonce;     // the user nonce of the release
-        bytes32 user;      // the user receiving the released tokens
-        bytes32 token;     // the token being released
-        uint256 amount;    // the amount being released
-        uint256 releasedAt;// the timestamp of the release
+        uint256 nonce; // the user nonce of the release
+        bytes32 user; // the user receiving the released tokens
+        bytes32 token; // the token being released
+        uint256 amount; // the amount being released
+        uint256 releasedAt; // the timestamp of the release
     }
 
     struct HubSpokeBalances {
@@ -167,15 +168,14 @@ library HubSpokeStructs {
     }
 
     struct SpokeState {
-        bytes32 spoke; // the address of the Spoke
-        bytes32 wrappedNativeAsset; // the address of the wrapped native asset on the Spoke chain
+        bytes32 spoke; // the address of the SpokeController
+        bytes32 wrappedNativeAsset; // the address of the wrapped native asset on the SpokeController chain
         // assetId => SpokeBalances
         mapping(bytes32 => HubSpokeBalances) balances;
         // user as bytes32 => nonce => Credit struct
         mapping(bytes32 => mapping(uint256 => Credit)) credits;
         // user as bytes32 => nonce
         mapping(bytes32 => uint256) maxNonces;
-
         uint256[50] __gap; // gap for additional params
     }
 
@@ -210,12 +210,10 @@ library HubSpokeStructs {
         uint256 _deprecated_liquidationFeePrecision;
         // chainId => SpokeParams
         mapping(uint16 => SpokeState) _deprecated_spokeStates;
-
         IWormholeTunnel _deprecated_wormholeTunnel;
-
         // this mirrors the spokeBalances but as wrapped addresses
-        // this is done so that reserves can be computed without knowing the Spoke address of the token
-        // this will be deprecated once we move to full Spoke custody of funds
+        // this is done so that reserves can be computed without knowing the SpokeController address of the token
+        // this will be deprecated once we move to full SpokeController custody of funds
         mapping(address => HubSpokeBalances) _deprecated_wrappedTokenSpokeBalances;
         IMoneyMarketRewardsDistributor _deprecated_rewardDistributor;
     }

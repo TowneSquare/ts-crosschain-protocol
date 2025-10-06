@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "./SpokeState.sol";
+import "./SpokeNativeToken.sol";
 
 /**
  * @title SpokeGetters
  * @notice A set of public getter functions
  */
-contract SpokeGetters is SpokeState {
+contract SpokeOperations is SpokeState {
     function chainId() public view returns (uint16) {
         return _state.chainId;
     }

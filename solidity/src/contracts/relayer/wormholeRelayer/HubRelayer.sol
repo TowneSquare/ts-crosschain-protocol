@@ -10,7 +10,7 @@ import {WormholeRelayerStorage} from "./WormholeRelayerStorage.sol";
 import "@wormhole-relayer/contracts/interfaces/relayer/TypedUnits.sol";
 import {ITownsqPriceOracle} from "../../../interfaces/ITownsqPriceOracle.sol";
 
-abstract contract WormholeRelayerBase is IWormholeRelayerBase {
+abstract contract HubRelayer is IWormholeRelayerBase {
     using WeiLib for Wei;
     using GasLib for Gas;
     using WeiPriceLib for WeiPrice;
