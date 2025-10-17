@@ -23,15 +23,15 @@ import {SpokeAccountingLogic} from "../../libraries/logic/accounting/SpokeAccoun
 import "@wormhole/Utils.sol";
 
 /**
- * @title Spoke
- * @notice The Spoke contract is the point of entry for cross-chain actions; users initiate an action by calling any of
+ * @title SpokeController
+ * @notice The SpokeController contract is the point of entry for cross-chain actions; users initiate an action by calling any of
  * the `public payable` functions (ex: `#depositCollateral`, `#withdrawCollateral`) with their desired asset and amount,
  * and using Wormhole we send the payload/tokens to the Hub on the target chain; if the action concludes with sending
  * tokens back to the user, we receive the final payload/tokens from the Hub before sending tokens to the user. This
  * contract also implements wormhole's CCTP contracts to send/receive USDC.
  */
 
-contract Spoke is ISpoke, Initializable, OwnableUpgradeable, PausableUpgradeable, HubSpokeEvents {
+contract SpokeController is ISpoke, Initializable, OwnableUpgradeable, PausableUpgradeable, HubSpokeEvents {
     using SafeERC20 for IERC20;
     using SpokeOptimisticFinalityLogic for HubSpokeStructs.SpokeOptimisticFinalityState;
 
@@ -54,7 +54,7 @@ contract Spoke is ISpoke, Initializable, OwnableUpgradeable, PausableUpgradeable
     }
 
     /**
-     * @notice Spoke initializer - Initializes a new spoke with given parameters
+     * @notice SpokeController initializer - Initializes a new spoke with given parameters
      * @param _hubChainId: Chain ID of the Hub
      * @param _hubContractAddress: Contract address of the Hub contract (on the Hub chain)
      * @param _tunnel: The Wormhole tunnel contract
@@ -150,7 +150,7 @@ contract Spoke is ISpoke, Initializable, OwnableUpgradeable, PausableUpgradeable
 
         // from this point the action is guaranteed to be a full finality deposit or repay (+native)
         if (costForReturnDelivery > 0) {
-            // there is no return delivery, because the funds are custodied by the Spoke
+            // there is no return delivery, because the funds are custodied by the SpokeController
             revert InvalidDeliveryCost();
         }
 
@@ -293,7 +293,7 @@ contract Spoke is ISpoke, Initializable, OwnableUpgradeable, PausableUpgradeable
         SpokeOptimisticFinalityLogic.handleRefundCredit(ofState, _user, _nonce);
     }
 
-    // last resort setter in case some unpredicted reverts happen and Spoke balances need to be corrected
+    // last resort setter in case some unpredicted reverts happen and SpokeController balances need to be corrected
     function overrideBalances(address token, uint256 creditGiven, uint256 unlocksPending, uint256 deposits, uint256 creditLost) external onlyOwner {
         HubSpokeStructs.SpokeBalances storage balance = ofState.tokenBalances[toWormholeFormat(token)];
         balance.creditGiven = creditGiven;
